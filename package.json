@@ -6,10 +6,11 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json -w",
-    "start": "tsc -w & nodemon dist/index.js"
+    "start": "node --loader ts-node/esm src/index.ts"
   },
   "dependencies": {
-    "fastify": "^5.1.0"
+    "fastify": "^5.1.0",
+    "ts-node": "^10.9.2"
   },
   "devDependencies": {
     "@types/node": "^22.9.3",
