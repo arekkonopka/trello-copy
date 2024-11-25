@@ -1,11 +1,12 @@
-// Require the framework and instantiate it
-
-// ESM
 import Fastify from 'fastify'
+import usersRoutes from './users/users.routes.js'
+import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
 
 const fastify = Fastify({
   logger: true,
-})
+}).withTypeProvider<TypeBoxTypeProvider>()
+
+fastify.register(usersRoutes)
 
 // Declare a route
 fastify.get('/', function (request, reply) {
