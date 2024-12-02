@@ -1,4 +1,6 @@
 import Fastify from 'fastify'
+import dotEnv from 'dotenv'
+
 import usersRoutes from './users/users.routes.js'
 import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
 
@@ -6,6 +8,7 @@ const fastify = Fastify({
   logger: true,
 }).withTypeProvider<TypeBoxTypeProvider>()
 
+dotEnv.config()
 fastify.register(usersRoutes)
 
 // Declare a route
