@@ -6,10 +6,10 @@ export const users = pgTable('users', {
   ...createdAt,
   ...updatedAt,
   uuid: uuid('uuid')
-    .default(sql`uuid_generate_v4()`)
+    .default(sql`gen_random_uuid()`)
     .primaryKey(),
   first_name: varchar('first_name').notNull(),
   last_name: varchar('last_name').notNull(),
-  email: varchar('email'),
+  email: varchar('email').unique(),
   avatar_url: varchar('avatar_url'),
 })
