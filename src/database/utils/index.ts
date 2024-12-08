@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm'
 import { timestamp } from 'drizzle-orm/pg-core'
 
 export const createdAt = {
-  createdAt: timestamp('created_at', {
+  created_at: timestamp('created_at', {
     mode: 'string',
     withTimezone: true,
     precision: 3,
@@ -11,7 +11,7 @@ export const createdAt = {
     .default(sql`CURRENT_TIMESTAMP`),
 }
 export const updatedAt = {
-  updatedAt: timestamp('updated_at', {
+  updated_at: timestamp('updated_at', {
     mode: 'string',
     withTimezone: true,
     precision: 3,
