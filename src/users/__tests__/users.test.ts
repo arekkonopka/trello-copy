@@ -76,7 +76,7 @@ describe('users', () => {
       )
     })
 
-    //  search
+    // search
     it('should return empty array when no user is found with provided search', async () => {
       await createUsers(fastify.db, 10)
 

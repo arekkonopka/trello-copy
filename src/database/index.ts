@@ -2,8 +2,6 @@ import type { FastifyPluginAsync } from 'fastify'
 import fp from 'fastify-plugin'
 
 import { drizzle } from 'drizzle-orm/node-postgres'
-// ASK: why is this not working?
-// import { Pool } from 'pg'
 import pg from 'pg'
 
 import * as schema from './schema.js'

@@ -10,8 +10,6 @@ export const getUsers = async (
   app: FastifyInstance,
   params: TGetUsersParams
 ) => {
-  // ASK: execute with sql returns weird response
-
   if ((params.limit && !params.offset) || (params.offset && !params.limit)) {
     throw httpErrors.badRequest(
       'Offset and limit are required when both are set'
@@ -69,6 +67,7 @@ export const getUser = async (app: FastifyInstance, uuid: string) => {
   const result = await app.db.execute(
     sql`SELECT * FROM users WHERE uuid = ${uuid}`
   )
+
   if (!result.rows.length) {
     throw httpErrors.notFound('User not found')
   }

@@ -1,5 +1,5 @@
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import { userFactory } from '../../factories/users.factory'
+import { userFactory } from '../../factories/user.factory'
 import { TUserSchema } from '../../users/schema/user.schema'
 import { sql } from 'drizzle-orm'
 import * as schema from '../../database/schema'

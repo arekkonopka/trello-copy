@@ -1,6 +1,6 @@
 import { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import * as schema from '../../database/schema'
-import { userFactory } from '../../factories/users.factory'
+import { userFactory } from '../../factories/user.factory'
 import { TUserSchema } from '../../users/schema/user.schema'
 import { sql } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
