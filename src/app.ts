@@ -5,6 +5,10 @@ import * as dotenv from 'dotenv'
 import usersRoutes from './users/users.routes.js'
 import drizzlePlugin from './database/index.js'
 import sensible from '@fastify/sensible'
+import fastifySession from '@fastify/session'
+import fastifyCookie from '@fastify/cookie'
+import { SESSION_EXPIRATION_TIME } from './config/constants.js'
+import authRoutes from './auth/auth.routes.js'
 
 // ASK: yarn start nie dziala, zle kompiuiluje utils...
 dotenv.config()
@@ -24,7 +28,16 @@ const buildServer = (config = {}): FastifyInstance => {
 
   fastify.register(sensible)
   fastify.register(drizzlePlugin)
+  fastify.register(fastifyCookie)
+  fastify.register(fastifySession, {
+    secret: process.env.SESSION_SECRET!,
+    cookie: {
+      secure: 'auto',
+      maxAge: SESSION_EXPIRATION_TIME,
+    },
+  })
   fastify.register(usersRoutes)
+  fastify.register(authRoutes)
 
   return fastify
 }
