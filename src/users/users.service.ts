@@ -96,7 +96,7 @@ export const createUser = async (app: FastifyInstance, user: CreateUser) => {
     RETURNING *
     `)
 
-  return result.rows
+  return result.rows[0]
 }
 
 export const updateUser = async (

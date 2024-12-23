@@ -1,0 +1,1 @@
+ALTER TABLE "auth" ALTER COLUMN "user_uuid" SET NOT NULL;

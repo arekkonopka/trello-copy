@@ -9,24 +9,34 @@ export const users = pgTable('users', {
   uuid: uuid('uuid')
     .default(sql`gen_random_uuid()`)
     .primaryKey(),
-  first_name: varchar('first_name').notNull(),
-  last_name: varchar('last_name').notNull(),
+  first_name: varchar('first_name'),
+  last_name: varchar('last_name'),
   email: varchar('email').unique(),
   avatar_url: varchar('avatar_url'),
 })
 
 export const usersRelations = relations(users, ({ one }) => ({
-  auth: one(users),
+  auth: one(auth),
 }))
 
 export const auth = pgTable('auth', {
   ...createdAt,
-  expires_at: timestamp('expires_at', {
-    mode: 'string',
-  }).notNull(),
-  session_id: uuid('uuid')
+  uuid: uuid('uuid')
     .default(sql`gen_random_uuid()`)
     .primaryKey(),
+  expires_at: timestamp('expires_at', {
+    mode: 'string',
+  }),
+  session_id: varchar('session_id'),
   password: varchar('password').notNull(),
-  user_uuid: uuid('user_uuid').references(() => users.uuid),
+  user_uuid: uuid('user_uuid')
+    .notNull()
+    .references(() => users.uuid),
 })
+
+export const authRelations = relations(auth, ({ one }) => ({
+  user: one(users, {
+    fields: [auth.user_uuid],
+    references: [users.uuid],
+  }),
+}))
