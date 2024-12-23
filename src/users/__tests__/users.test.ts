@@ -50,7 +50,7 @@ describe('users', () => {
   })
 
   afterEach(async () => {
-    await fastify.db.execute(sql`TRUNCATE TABLE users`)
+    await fastify.db.execute(sql`TRUNCATE TABLE users CASCADE`)
   })
 
   describe('/GET users', async () => {
@@ -368,17 +368,15 @@ describe('users', () => {
       })
 
       expect(response.statusCode).toBe(200)
-      expect(response.body).toEqual([
-        {
-          uuid: expect.any(String),
-          first_name: 'John',
-          last_name: 'Doe',
-          email: 'John@Doe.com',
-          created_at: expect.any(String),
-          updated_at: expect.any(String),
-          avatar_url: null,
-        },
-      ])
+      expect(response.body).toEqual({
+        uuid: expect.any(String),
+        first_name: 'John',
+        last_name: 'Doe',
+        email: 'John@Doe.com',
+        created_at: expect.any(String),
+        updated_at: expect.any(String),
+        avatar_url: null,
+      })
     })
   })
 

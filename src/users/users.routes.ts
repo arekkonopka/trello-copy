@@ -66,7 +66,7 @@ const usersRoutes = (fastify: FastifyInstance, _: object, done: () => void) => {
       schema: {
         body: createUserDto,
         response: {
-          200: Type.Array(userSchema),
+          200: userSchema,
           400: errorSchema,
         },
       },
