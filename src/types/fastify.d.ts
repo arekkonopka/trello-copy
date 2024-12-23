@@ -1,5 +1,6 @@
 import * as fastify from 'fastify'
 import * as http from 'http'
+import { Transporter } from 'nodemailer'
 
 import { type PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import * as schema from '../database/schema.js'
@@ -11,5 +12,6 @@ declare module 'fastify' {
     HttpResponse = http.ServerResponse
   > {
     db: PostgresJsDatabase<typeof schema>
+    mailer: Transporter
   }
 }

@@ -9,6 +9,7 @@ import fastifySession from '@fastify/session'
 import fastifyCookie from '@fastify/cookie'
 import { SESSION_EXPIRATION_TIME } from './config/constants.js'
 import authRoutes from './auth/auth.routes.js'
+import { mailerPlugin } from './plugins/mailer.plugin.js'
 
 // ASK: yarn start nie dziala, zle kompiuiluje utils...
 dotenv.config()
@@ -36,6 +37,8 @@ const buildServer = (config = {}): FastifyInstance => {
       maxAge: SESSION_EXPIRATION_TIME,
     },
   })
+  fastify.register(mailerPlugin)
+
   fastify.register(usersRoutes)
   fastify.register(authRoutes)
 
