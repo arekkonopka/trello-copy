@@ -116,6 +116,7 @@ describe('auth', () => {
       const registerResponse = await request(fastify.server)
         .post('/register')
         .send(user)
+
       const registeredUser = registerResponse.body[0]
 
       const response = await request(fastify.server).post('/login').send({
@@ -138,6 +139,8 @@ describe('auth', () => {
         uuid: expect.any(String),
         session_id: expect.any(String),
         password: expect.any(String),
+        otp: expect.any(String),
+        is_email_verified: expect.any(Boolean),
       })
     })
   })
@@ -191,6 +194,149 @@ describe('auth', () => {
         `)
 
       expect(rows).toHaveLength(1)
+    })
+  })
+
+  describe('otp', () => {
+    it('should return 404 user not found', async () => {
+      const response = await request(fastify.server).post('/verify-otp').send({
+        email: 'email@test.com',
+        otp: '123456',
+      })
+
+      expect(response.body).toEqual({
+        statusCode: 404,
+        error: 'Not Found',
+        message: 'User not found',
+      })
+    })
+
+    it('should return 400 when otp not found', async () => {
+      const user = {
+        email: 'user@test.com',
+        password: '1234',
+        first_name: 'John',
+        last_name: 'Doe',
+      }
+
+      const responseRegister = await request(fastify.server)
+        .post('/register')
+        .send(user)
+
+      await fastify.db.execute(`
+        UPDATE auth 
+        SET otp = null
+        WHERE user_uuid = '${responseRegister.body[0].uuid}'
+        `)
+
+      const responseOtp = await request(fastify.server)
+        .post('/verify-otp')
+        .send({
+          email: responseRegister.body[0].email,
+          otp: '123456',
+        })
+
+      expect(responseOtp.body).toEqual({
+        statusCode: 404,
+        error: 'Not Found',
+        message: 'Otp not found',
+      })
+    })
+
+    it('should return 422 when incorrect OTP', async () => {
+      const user = {
+        email: 'user@test.com',
+        password: '1234',
+        first_name: 'John',
+        last_name: 'Doe',
+      }
+
+      const responseRegister = await request(fastify.server)
+        .post('/register')
+        .send(user)
+
+      const responseOtp = await request(fastify.server)
+        .post('/verify-otp')
+        .send({
+          email: responseRegister.body[0].email,
+          otp: '123456',
+        })
+
+      expect(responseOtp.body).toEqual({
+        statusCode: 422,
+        error: 'Unprocessable Entity',
+        message: 'Incorrect Otp',
+      })
+    })
+
+    it('should return an error when OTP format is invalid', async () => {
+      const user = {
+        email: 'user@test.com',
+        password: '1234',
+        first_name: 'John',
+        last_name: 'Doe',
+      }
+
+      const responseRegister = await request(fastify.server)
+        .post('/register')
+        .send(user)
+
+      const userEmail = responseRegister.body[0].email
+      const userUuid = responseRegister.body[0].uuid
+
+      const responseOtp = await request(fastify.server)
+        .post('/verify-otp')
+        .send({
+          email: userEmail,
+          otp: 111,
+        })
+
+      expect(responseOtp.body).toEqual({
+        code: 'FST_ERR_VALIDATION',
+        error: 'Bad Request',
+        message: 'body/otp must match pattern "^[0-9]{6}$"',
+        statusCode: 400,
+      })
+    })
+
+    it('should return 200 when otp is verified', async () => {
+      const user = {
+        email: 'user@test.com',
+        password: '1234',
+        first_name: 'John',
+        last_name: 'Doe',
+      }
+
+      const responseRegister = await request(fastify.server)
+        .post('/register')
+        .send(user)
+
+      const userEmail = responseRegister.body[0].email
+      const userUuid = responseRegister.body[0].uuid
+
+      const otpQuery = await fastify.db.execute(sql`
+        SELECT otp FROM auth WHERE user_uuid = ${userUuid}
+      `)
+
+      const otp = otpQuery.rows[0]?.otp
+
+      const responseOtp = await request(fastify.server)
+        .post('/verify-otp')
+        .send({
+          email: userEmail,
+          otp,
+        })
+
+      expect(responseOtp.statusCode).toBe(200)
+
+      const verificationQuery = await fastify.db.execute(sql`
+          SELECT is_email_verified 
+          FROM auth
+          WHERE user_uuid = ${userUuid}
+        `)
+
+      const isEmailVerified = verificationQuery.rows[0]?.is_email_verified
+      expect(isEmailVerified).toBe(true)
     })
   })
 })

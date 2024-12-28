@@ -6,6 +6,8 @@ import { createUser, findUserByEmail } from '../users/users.service'
 import { httpErrors } from '@fastify/sensible'
 import { sql } from 'drizzle-orm'
 import { TRegisterSchema } from './schema/register.schema'
+import { sendEmail } from '../email/email.service'
+import { generateOTP } from 'otp-agent'
 
 export const loginHandler = async (
   app: FastifyInstance,
@@ -86,11 +88,62 @@ export const registerHandler = async (
 
   const user = await createUser(app, { email, first_name, last_name })
   const hashedPassword = await hashPassword(password)
+  const otp = generateOTP()
 
   await app.db.execute(sql`
-    INSERT INTO auth (password, user_uuid)
-    VALUES (${hashedPassword}, ${user.uuid})
+    INSERT INTO auth (password, user_uuid, otp)
+    VALUES (${hashedPassword}, ${user.uuid}, ${otp})
   `)
 
+  sendEmail(app, {
+    to: email,
+    subject: 'Welcome to app',
+    templateName: 'welcome',
+    templateBody: {
+      name: first_name,
+      verificationCode: otp,
+    },
+  })
+
   return [user]
+}
+
+export const getUserOtp = async (app: FastifyInstance, uuid: string) => {
+  const { rows } = await app.db.execute(sql`
+      SELECT otp FROM auth 
+      WHERE user_uuid = ${uuid}
+    `)
+
+  return rows[0].otp
+}
+
+export const compareOtp = (otp: string, providedOtp: string) => {
+  return otp === providedOtp
+}
+
+export const verifyOtp = async (
+  app: FastifyInstance,
+  body: { otp: string; email: string }
+) => {
+  const user = await findUserByEmail(app, body.email)
+
+  if (!user.length) {
+    throw httpErrors.notFound('User not found')
+  }
+
+  const userOtp = await getUserOtp(app, user[0].uuid)
+
+  if (!userOtp) {
+    throw httpErrors.notFound('Otp not found')
+  }
+
+  if (!compareOtp(userOtp, body.otp)) {
+    throw httpErrors.unprocessableEntity('Incorrect Otp')
+  }
+
+  await app.db.execute(sql`
+      UPDATE auth
+      SET is_email_verified = true
+      WHERE user_uuid = ${user[0].uuid}
+    `)
 }

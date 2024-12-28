@@ -1,9 +1,10 @@
 import { FastifyInstance } from 'fastify'
-import { loginHandler, registerHandler } from './auth.service'
+import { loginHandler, registerHandler, verifyOtp } from './auth.service'
 import { loginResponse, loginSchema } from './schema/login.schema'
 import { registerSchema, TRegisterSchema } from './schema/register.schema'
 import { Type } from '@sinclair/typebox'
 import { userSchema } from '../users/schema/user.schema'
+import { otpSchema, TOtpSchema } from './schema/otp.schema'
 
 const authRoutes = (fastify: FastifyInstance, _: object, done: () => void) => {
   fastify.post(
@@ -37,6 +38,20 @@ const authRoutes = (fastify: FastifyInstance, _: object, done: () => void) => {
       const result = await loginHandler(fastify, request)
 
       reply.status(201).send(result)
+    }
+  )
+
+  fastify.post(
+    '/verify-otp',
+    {
+      schema: {
+        body: otpSchema,
+      },
+    },
+    async (request, reply) => {
+      await verifyOtp(fastify, request.body as TOtpSchema)
+
+      reply.status(200)
     }
   )
 

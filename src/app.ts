@@ -9,7 +9,7 @@ import fastifySession from '@fastify/session'
 import fastifyCookie from '@fastify/cookie'
 import { SESSION_EXPIRATION_TIME } from './config/constants.js'
 import authRoutes from './auth/auth.routes.js'
-import { mailerPlugin } from './plugins/mailer.plugin.js'
+import fastifyMailer from 'fastify-mailer'
 
 // ASK: yarn start nie dziala, zle kompiuiluje utils...
 dotenv.config()
@@ -28,6 +28,17 @@ const buildServer = (config = {}): FastifyInstance => {
   const fastify = Fastify(opts).withTypeProvider<TypeBoxTypeProvider>()
 
   fastify.register(sensible)
+  fastify.register(fastifyMailer, {
+    defaults: { from: 'noreply@test.com' },
+    transport: {
+      host: 'sandbox.smtp.mailtrap.io',
+      port: 2525,
+      auth: {
+        user: process.env.MAILER_USER,
+        pass: process.env.MAILER_PASS,
+      },
+    },
+  })
   fastify.register(drizzlePlugin)
   fastify.register(fastifyCookie)
   fastify.register(fastifySession, {
@@ -37,7 +48,6 @@ const buildServer = (config = {}): FastifyInstance => {
       maxAge: SESSION_EXPIRATION_TIME,
     },
   })
-  fastify.register(mailerPlugin)
 
   fastify.register(usersRoutes)
   fastify.register(authRoutes)
