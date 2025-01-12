@@ -31,6 +31,5 @@ export const createUsers = async (
       )
     })
   )
-
   return result.rows
 }

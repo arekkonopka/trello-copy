@@ -1,5 +1,5 @@
 import * as bcrypt from 'bcrypt'
-import { FastifyInstance, FastifyRequest } from 'fastify'
+import fastify, { FastifyInstance, FastifyRequest } from 'fastify'
 
 import { TLoginSchema } from './schema/login.schema'
 import { createUser, findUserByEmail } from '../users/users.service'
@@ -8,6 +8,7 @@ import { sql } from 'drizzle-orm'
 import { TRegisterSchema } from './schema/register.schema'
 import { sendEmail } from '../email/email.service'
 import { generateOTP } from 'otp-agent'
+import { TResetPasswordSchema } from './schema/resetPassword.schema'
 
 export const loginHandler = async (
   app: FastifyInstance,
@@ -42,12 +43,32 @@ export const loginHandler = async (
   }
 
   await app.db.execute(sql`
-    UPDATE auth
-    SET expires_at = ${session.cookie.expires}, session_id = ${session.sessionId}
-    WHERE uuid = ${userCredentials.uuid}
-    `)
+    INSERT INTO session (user_uuid, session_id, expires_at)
+    VALUES (${user.uuid}, ${session.sessionId}, ${session.cookie.expires})`)
 
   return { message: 'User successfully logged in' }
+}
+
+export const logoutHandler = async (
+  app: FastifyInstance,
+  request: FastifyRequest
+) => {
+  const sessionId = request.session.sessionId
+
+  if (!sessionId) {
+    throw httpErrors.badRequest('Invalid session')
+  }
+
+  const result = await app.db.execute(sql`
+    UPDATE session 
+    SET is_active = false
+    WHERE session_id = ${sessionId}`)
+
+  if (result.rowCount === 0) {
+    throw httpErrors.internalServerError(
+      'Failed to log out. No session updated.'
+    )
+  }
 }
 
 export const verifyPassword = (password: string, hash: string) => {
@@ -91,11 +112,11 @@ export const registerHandler = async (
   const otp = generateOTP()
 
   await app.db.execute(sql`
-    INSERT INTO auth (password, user_uuid, otp)
+  INSERT INTO auth (password, user_uuid, otp)
     VALUES (${hashedPassword}, ${user.uuid}, ${otp})
   `)
 
-  sendEmail(app, {
+  await sendEmail(app, {
     to: email,
     subject: 'Welcome to app',
     templateName: 'welcome',
@@ -114,7 +135,13 @@ export const getUserOtp = async (app: FastifyInstance, uuid: string) => {
       WHERE user_uuid = ${uuid}
     `)
 
-  return rows[0].otp
+  const otp = rows?.[0]?.otp
+
+  if (!otp) {
+    throw httpErrors.notFound('Otp not found')
+  }
+
+  return otp
 }
 
 export const compareOtp = (otp: string, providedOtp: string) => {
@@ -133,10 +160,6 @@ export const verifyOtp = async (
 
   const userOtp = await getUserOtp(app, user[0].uuid)
 
-  if (!userOtp) {
-    throw httpErrors.notFound('Otp not found')
-  }
-
   if (!compareOtp(userOtp, body.otp)) {
     throw httpErrors.unprocessableEntity('Incorrect Otp')
   }
@@ -145,5 +168,96 @@ export const verifyOtp = async (
       UPDATE auth
       SET is_email_verified = true
       WHERE user_uuid = ${user[0].uuid}
+    `)
+}
+
+export const loginGoogleHandler = async (
+  app: FastifyInstance,
+  req: FastifyRequest
+) => {
+  const session = req.session
+
+  if (!session?.sessionId || !session?.cookie?.expires) {
+    throw httpErrors.badRequest('Invalid session')
+  }
+
+  const { token } =
+    await app.googleOAuth2.getAccessTokenFromAuthorizationCodeFlow(req)
+
+  const userResponse = await fetch(
+    `https://www.googleapis.com/oauth2/v3/userinfo`,
+    {
+      headers: {
+        Authorization: `Bearer ${token.access_token}`,
+      },
+    }
+  )
+
+  if (!userResponse.ok) {
+    throw httpErrors.internalServerError(
+      'Failed to fetch user info from Google'
+    )
+  }
+
+  const userInfo = await userResponse.json()
+  let dbUser = await findUserByEmail(app, userInfo.email)
+
+  if (!dbUser) {
+    dbUser = await app.db.execute(sql`
+      INSERT INTO users (first_name, last_name, email, avatar_url)
+      VALUES (${userInfo.given_name}, ${userInfo.family_name}, ${userInfo.email}, ${userInfo.avatar_url})
+      `)
+  }
+
+  await app.db.execute(sql`
+    INSERT INTO auth (expires_at, session_id, user_uuid)
+    VALUES (${session.cookie.expires}, ${session.sessionId}, ${dbUser[0].uuid})
+    `)
+}
+
+export const resetPasswordHandler = async (
+  app: FastifyInstance,
+  request: FastifyRequest
+) => {
+  const sessionId = request.session.sessionId
+  const { oldPassword, newPassword } = request.body as TResetPasswordSchema
+
+  if (oldPassword === newPassword) {
+    throw httpErrors.badRequest(
+      'New password cannot be the same as the old password.'
+    )
+  }
+
+  const {
+    rows: [session],
+  } = await app.db.execute(sql`
+    SELECT * FROM session
+    WHERE session_id = ${sessionId}
+  `)
+
+  const {
+    rows: [userCredentials],
+  } = await app.db.execute(sql`
+    SELECT * FROM auth
+    WHERE user_uuid = ${session.user_uuid}
+  `)
+
+  const isPasswordVerified = await verifyPassword(
+    oldPassword,
+    userCredentials.password
+  )
+
+  if (!isPasswordVerified) {
+    throw httpErrors.badRequest(
+      'The provided old password does not match our records.'
+    )
+  }
+
+  const hashedPassword = await hashPassword(newPassword)
+
+  await app.db.execute(sql`
+    UPDATE auth
+    SET password = ${hashedPassword}
+    WHERE user_uuid = ${session.user_uuid}
     `)
 }

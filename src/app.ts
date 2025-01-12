@@ -10,6 +10,9 @@ import fastifyCookie from '@fastify/cookie'
 import { SESSION_EXPIRATION_TIME } from './config/constants.js'
 import authRoutes from './auth/auth.routes.js'
 import fastifyMailer from 'fastify-mailer'
+import registerOauth2Provider from './auth/providers/oauth2.js'
+import isUserLoggedIn from './auth/decorators/isUserLoggedIn.js'
+import authPlugin from './auth/index.js'
 
 // ASK: yarn start nie dziala, zle kompiuiluje utils...
 dotenv.config()
@@ -39,8 +42,10 @@ const buildServer = (config = {}): FastifyInstance => {
       },
     },
   })
-  fastify.register(drizzlePlugin)
   fastify.register(fastifyCookie)
+  fastify.register(drizzlePlugin)
+  fastify.register(authPlugin)
+  registerOauth2Provider(fastify)
   fastify.register(fastifySession, {
     secret: process.env.SESSION_SECRET!,
     cookie: {
@@ -49,6 +54,10 @@ const buildServer = (config = {}): FastifyInstance => {
     },
   })
 
+  // decorators
+  fastify.register(isUserLoggedIn)
+
+  // routes
   fastify.register(usersRoutes)
   fastify.register(authRoutes)
 

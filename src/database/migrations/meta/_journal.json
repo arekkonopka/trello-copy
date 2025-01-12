@@ -85,6 +85,20 @@
       "when": 1735040668241,
       "tag": "0011_cultured_serpent_society",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1735553367094,
+      "tag": "0012_flimsy_sentinel",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1736678392743,
+      "tag": "0013_thick_hex",
+      "breakpoints": true
     }
   ]
 }

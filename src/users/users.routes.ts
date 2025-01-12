@@ -32,6 +32,7 @@ const usersRoutes = (fastify: FastifyInstance, _: object, done: () => void) => {
           400: errorSchema,
         },
       },
+      preHandler: fastify.auth([fastify.isUserLoggedIn]),
     },
     async (request, reply) => {
       const params = request.query as TGetUsersParams
@@ -50,6 +51,7 @@ const usersRoutes = (fastify: FastifyInstance, _: object, done: () => void) => {
           404: errorSchema,
         },
       },
+      preHandler: fastify.auth([fastify.isUserLoggedIn]),
     },
     async (request, reply) => {
       const { uuid } = request.params as { uuid: string }
@@ -70,6 +72,7 @@ const usersRoutes = (fastify: FastifyInstance, _: object, done: () => void) => {
           400: errorSchema,
         },
       },
+      preHandler: fastify.auth([fastify.isUserLoggedIn]),
     },
     async (request, reply) => {
       const user = request.body as CreateUser
@@ -90,6 +93,7 @@ const usersRoutes = (fastify: FastifyInstance, _: object, done: () => void) => {
           404: errorSchema,
         },
       },
+      preHandler: fastify.auth([fastify.isUserLoggedIn]),
     },
     async (request, reply) => {
       const { uuid } = request.params as { uuid: string }
@@ -114,6 +118,7 @@ const usersRoutes = (fastify: FastifyInstance, _: object, done: () => void) => {
           404: errorSchema,
         },
       },
+      preHandler: fastify.auth([fastify.isUserLoggedIn]),
     },
     async (request, reply) => {
       const { uuid } = request.params as { uuid: string }

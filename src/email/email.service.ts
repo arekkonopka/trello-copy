@@ -1,5 +1,5 @@
 import * as fs from 'fs'
-import { FastifyInstance } from 'fastify'
+import fastify, { FastifyInstance } from 'fastify'
 import Handlebars from 'handlebars'
 
 type TEmailBody = {
@@ -19,9 +19,11 @@ export const sendEmail = async (app: FastifyInstance, body: TEmailBody) => {
   const template = Handlebars.compile(templateSource)
   const html = template(body.templateBody)
 
-  return await mailer.sendMail({
+  await mailer.sendMail({
     to: body.to,
     subject: body.subject,
     html,
   })
+
+  app.log.info('email has been send successfully')
 }

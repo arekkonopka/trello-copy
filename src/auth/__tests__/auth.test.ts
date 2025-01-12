@@ -1,4 +1,12 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest'
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+  afterEach,
+  vi,
+} from 'vitest'
 import buildServer from '../../app'
 import { GenericContainer, StartedTestContainer } from 'testcontainers'
 
@@ -7,12 +15,21 @@ import { sql } from 'drizzle-orm'
 import request from 'supertest'
 import { FastifyInstance } from 'fastify'
 import { createUser } from '../../database/helpers/createUser'
+import * as emailService from '../../email/email.service'
+import logInUser from '../../database/helpers/loginUser'
+import { hashPassword, verifyPassword } from '../auth.service'
+
+global.fetch = vi.fn()
 
 describe('auth', () => {
   let container: StartedTestContainer
   let fastify: FastifyInstance
 
   beforeAll(async () => {
+    vi.spyOn(emailService, 'sendEmail').mockImplementation(() =>
+      Promise.resolve()
+    )
+
     container = await new GenericContainer('postgres:16')
       .withExposedPorts(5432)
       .withEnvironment({
@@ -27,6 +44,7 @@ describe('auth', () => {
     )}/test`
 
     process.env.DATABASE_URL = connectionString
+
     fastify = buildServer()
     await fastify.ready()
 
@@ -127,7 +145,7 @@ describe('auth', () => {
       expect(response.body).toEqual({ message: 'User successfully logged in' })
 
       const { rows } = await fastify.db.execute(sql`
-        SELECT * FROM auth 
+        SELECT * FROM session 
         WHERE user_uuid = ${registeredUser.uuid}
         `)
 
@@ -138,10 +156,52 @@ describe('auth', () => {
         expires_at: expect.any(String),
         uuid: expect.any(String),
         session_id: expect.any(String),
-        password: expect.any(String),
-        otp: expect.any(String),
-        is_email_verified: expect.any(Boolean),
+        is_active: true,
       })
+    })
+  })
+
+  describe('logout', () => {
+    it('should return "Failed to log out. No session updated."', async () => {
+      const logoutResponse = await request(fastify.server).post('/logout')
+
+      expect(logoutResponse.body).toEqual({
+        error: 'Internal Server Error',
+        message: 'Failed to log out. No session updated.',
+        statusCode: 500,
+      })
+    })
+
+    it('should logout user', async () => {
+      const user = {
+        email: 'user@test.com',
+        password: '1234',
+        first_name: 'John',
+        last_name: 'Doe',
+      }
+
+      await request(fastify.server).post('/register').send(user)
+
+      const loginResponse = await request(fastify.server).post('/login').send({
+        email: user.email,
+        password: user.password,
+      })
+
+      const sessionId =
+        loginResponse.headers['set-cookie'][0].match(/sessionId=([^;]+)/)?.[1]
+
+      const logoutResponse = await request(fastify.server)
+        .post('/logout')
+        .set('Cookie', [`sessionId=${sessionId}`])
+
+      expect(logoutResponse.statusCode).toBe(200)
+
+      const { rows } = await fastify.db.execute(sql`
+          SELECT * FROM session
+          WHERE session_id LIKE ${sessionId?.split('.')[0]}
+          `)
+
+      expect(rows[0].is_active).toBe(false)
     })
   })
 
@@ -337,6 +397,84 @@ describe('auth', () => {
 
       const isEmailVerified = verificationQuery.rows[0]?.is_email_verified
       expect(isEmailVerified).toBe(true)
+    })
+  })
+
+  describe('reset password', () => {
+    it('should return unauthorized', async () => {
+      const response = await request(fastify.server)
+        .post('/reset-password')
+        .send({
+          oldPassword: 'oldPassword',
+          newPassword: 'newPassword',
+        })
+
+      expect(response.body).toEqual({
+        error: 'Unauthorized',
+        message: 'unauthorized',
+        statusCode: 401,
+      })
+    })
+
+    it('should return 400 old password does not match', async () => {
+      const { sessionCookie } = await logInUser(fastify)
+
+      const response = await request(fastify.server)
+        .post('/reset-password')
+        .send({ oldPassword: 'wrongOldPassword', newPassword: 'newPassword' })
+        .set('Cookie', sessionCookie)
+
+      expect(response.body).toEqual({
+        error: 'Bad Request',
+        message: 'The provided old password does not match our records.',
+        statusCode: 400,
+      })
+    })
+
+    it('should return 400 New password cannot be the same as the old password.', async () => {
+      const { sessionCookie, userData } = await logInUser(fastify)
+
+      const response = await request(fastify.server)
+        .post('/reset-password')
+        .send({
+          oldPassword: userData.password,
+          newPassword: userData.password,
+        })
+        .set('Cookie', sessionCookie)
+
+      expect(response.body).toEqual({
+        error: 'Bad Request',
+        message: 'New password cannot be the same as the old password.',
+        statusCode: 400,
+      })
+    })
+
+    it('should reset password', async () => {
+      const { userCredentials, sessionCookie, userData } = await logInUser(
+        fastify
+      )
+
+      const newPassword = 'newPassword'
+
+      const response = await request(fastify.server)
+        .post('/reset-password')
+        .send({ oldPassword: userData.password, newPassword })
+        .set('Cookie', sessionCookie)
+
+      expect(response.statusCode).toEqual(200)
+
+      const {
+        rows: [updatedUserCredentials],
+      } = await fastify.db.execute(sql`
+        SELECT * FROM auth
+        WHERE uuid = ${userCredentials.uuid}
+        `)
+
+      const isPasswordValid = await verifyPassword(
+        newPassword,
+        updatedUserCredentials.password
+      )
+      expect(isPasswordValid).toBe(true)
     })
   })
 })

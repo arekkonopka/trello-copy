@@ -15,8 +15,9 @@ export const users = pgTable('users', {
   avatar_url: varchar('avatar_url'),
 })
 
-export const usersRelations = relations(users, ({ one }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   auth: one(auth),
+  session: many(session),
 }))
 
 export const auth = pgTable('auth', {
@@ -24,11 +25,7 @@ export const auth = pgTable('auth', {
   uuid: uuid('uuid')
     .default(sql`gen_random_uuid()`)
     .primaryKey(),
-  expires_at: timestamp('expires_at', {
-    mode: 'string',
-  }),
-  session_id: varchar('session_id'),
-  password: varchar('password').notNull(),
+  password: varchar('password'),
   user_uuid: uuid('user_uuid')
     .notNull()
     .references(() => users.uuid),
@@ -39,6 +36,28 @@ export const auth = pgTable('auth', {
 export const authRelations = relations(auth, ({ one }) => ({
   user: one(users, {
     fields: [auth.user_uuid],
+    references: [users.uuid],
+  }),
+}))
+
+export const session = pgTable('session', {
+  ...createdAt,
+  uuid: uuid('uuid')
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  user_uuid: uuid('user_uuid')
+    .notNull()
+    .references(() => users.uuid),
+  session_id: varchar('session_id').unique(),
+  expires_at: timestamp('expires_at', {
+    mode: 'string',
+  }),
+  is_active: boolean('is_active').default(true),
+})
+
+export const sessionRelations = relations(session, ({ one }) => ({
+  user: one(users, {
+    fields: [session.user_uuid],
     references: [users.uuid],
   }),
 }))
