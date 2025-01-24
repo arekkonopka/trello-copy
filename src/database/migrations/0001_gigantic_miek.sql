@@ -1,4 +1,3 @@
--- ASK: dodalem tutaj rozszerzenie, czy mozna to dodawac tak z palca? orzez to ze tutaj bylo uuuid_generate to w testach wymaalo tego
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 ALTER TABLE "users" ADD PRIMARY KEY ("uuid");--> statement-breakpoint

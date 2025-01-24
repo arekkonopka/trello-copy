@@ -1,0 +1,1 @@
+export const SESSION_EXPIRATION_TIME = 1800000
