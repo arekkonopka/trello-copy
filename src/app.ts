@@ -13,8 +13,10 @@ import fastifyMailer from 'fastify-mailer'
 import registerOauth2Provider from './auth/providers/oauth2.js'
 import isUserLoggedIn from './auth/decorators/isUserLoggedIn.js'
 import authPlugin from './auth/index.js'
+import fastifyMultipart from '@fastify/multipart'
+import queuePlugin from './plugins/queue.plugin.js'
+import { csvWorkerSetup } from './workers/csv.worker.js'
 
-// ASK: yarn start nie dziala, zle kompiuiluje utils...
 dotenv.config()
 
 const buildServer = (config = {}): FastifyInstance => {
@@ -45,6 +47,7 @@ const buildServer = (config = {}): FastifyInstance => {
   fastify.register(fastifyCookie)
   fastify.register(drizzlePlugin)
   fastify.register(authPlugin)
+  fastify.register(fastifyMultipart)
   registerOauth2Provider(fastify)
   fastify.register(fastifySession, {
     secret: process.env.SESSION_SECRET!,
@@ -56,10 +59,15 @@ const buildServer = (config = {}): FastifyInstance => {
 
   // decorators
   fastify.register(isUserLoggedIn)
+  fastify.register(queuePlugin)
 
   // routes
   fastify.register(usersRoutes)
   fastify.register(authRoutes)
+
+  fastify.ready().then(() => {
+    csvWorkerSetup(fastify)
+  })
 
   return fastify
 }

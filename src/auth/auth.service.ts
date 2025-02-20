@@ -9,6 +9,16 @@ import { TRegisterSchema } from './schema/register.schema'
 import { sendEmail } from '../email/email.service'
 import { generateOTP } from 'otp-agent'
 import { TResetPasswordSchema } from './schema/resetPassword.schema'
+import { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
+import * as schema from '../database/schema'
+
+// test user
+// {
+//   "email": "arekcommerce@gmail.com",
+//   "password": "1234",
+//   "first_name": "arek",
+//   "last_name": "konopka"
+// }
 
 export const loginHandler = async (
   app: FastifyInstance,
@@ -89,6 +99,20 @@ export const getUserCredentials = async (
   return result.rows?.[0]
 }
 
+export const getUserBySessionId = async (
+  db: PostgresJsDatabase<typeof schema>,
+  sessionId: string
+) => {
+  const result = await db.execute(
+    sql`
+    SELECT * FROM session
+    WHERE session_id = ${sessionId}
+    `
+  )
+
+  return result.rows?.[0]
+}
+
 export const hashPassword = (password: string) => {
   const salt = 10
 
@@ -108,6 +132,7 @@ export const registerHandler = async (
   }
 
   const user = await createUser(app, { email, first_name, last_name })
+
   const hashedPassword = await hashPassword(password)
   const otp = generateOTP()
 

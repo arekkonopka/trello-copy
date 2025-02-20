@@ -99,6 +99,13 @@
       "when": 1736678392743,
       "tag": "0013_thick_hex",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1738654272118,
+      "tag": "0014_regular_guardian",
+      "breakpoints": true
     }
   ]
 }
