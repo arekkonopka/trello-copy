@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, boolean } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, varchar, boolean, jsonb } from 'drizzle-orm/pg-core'
 import { createdAt, updatedAt } from './utils'
 import { relations, sql } from 'drizzle-orm'
 import { timestamp } from 'drizzle-orm/pg-core'
@@ -18,6 +18,7 @@ export const users = pgTable('users', {
 export const usersRelations = relations(users, ({ one, many }) => ({
   auth: one(auth),
   session: many(session),
+  jobs: many(jobs),
 }))
 
 export const auth = pgTable('auth', {
@@ -58,6 +59,27 @@ export const session = pgTable('session', {
 export const sessionRelations = relations(session, ({ one }) => ({
   user: one(users, {
     fields: [session.user_uuid],
+    references: [users.uuid],
+  }),
+}))
+
+export const jobs = pgTable('jobs', {
+  ...createdAt,
+  uuid: uuid('uuid')
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  user_uuid: uuid('user_uuid')
+    .notNull()
+    .references(() => users.uuid),
+  name: varchar('name'),
+  status: varchar('status').notNull(),
+  data: jsonb('data'),
+  errors: jsonb('errors'),
+})
+
+export const jobsRelations = relations(jobs, ({ one }) => ({
+  user: one(users, {
+    fields: [jobs.user_uuid],
     references: [users.uuid],
   }),
 }))

@@ -5,6 +5,7 @@ import {
   updateUser,
   deleteUser,
   getUser,
+  csvUploadHandler,
 } from './users.service.js'
 import { CreateUser, createUserDto } from './schema/create-user.schema.js'
 import { getUsersParams, TGetUsersParams } from './schema/get-users.schema.js'
@@ -126,6 +127,24 @@ const usersRoutes = (fastify: FastifyInstance, _: object, done: () => void) => {
       await deleteUser(fastify, uuid)
 
       reply.send({ message: `User ${uuid} deleted` })
+    }
+  )
+
+  fastify.post(
+    '/users/csv-upload',
+    // {
+    //   preHandler: fastify.auth([fastify.isUserLoggedIn]),
+    // },
+    async (request, reply) => {
+      const jobId = await csvUploadHandler(fastify, request)
+
+      return reply.status(202).send({
+        message: 'CSV file uploaded',
+        statusCode: 202,
+        meta: {
+          jobId,
+        },
+      })
     }
   )
 

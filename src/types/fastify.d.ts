@@ -5,6 +5,7 @@ import { Transporter } from 'nodemailer'
 import { type PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import * as schema from '../database/schema.js'
 import { OAuth2Namespace } from '@fastify/oauth2'
+import { Queue } from 'bullmq'
 
 declare module 'fastify' {
   export interface FastifyInstance<
@@ -13,6 +14,7 @@ declare module 'fastify' {
     HttpResponse = http.ServerResponse
   > {
     db: PostgresJsDatabase<typeof schema>
+    csvQueue: Queue
     mailer: Transporter
     googleOAuth2: OAuth2Namespace
     isUserLoggedIn: (req: FastifyRequest, reply: FastifyReply) => Promise<void>
