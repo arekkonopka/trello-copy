@@ -19,6 +19,12 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   auth: one(auth),
   session: many(session),
   jobs: many(jobs),
+  ticketAssignee: many(tickets, {
+    relationName: 'ticket_assignee',
+  }),
+  ticket_creator: many(tickets, {
+    relationName: 'ticket_creator',
+  }),
 }))
 
 export const auth = pgTable('auth', {
@@ -81,5 +87,32 @@ export const jobsRelations = relations(jobs, ({ one }) => ({
   user: one(users, {
     fields: [jobs.user_uuid],
     references: [users.uuid],
+  }),
+}))
+
+export const tickets = pgTable('tickets', {
+  ...createdAt,
+  ...updatedAt,
+  uuid: uuid('uuid')
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  title: varchar('title'),
+  description: varchar('description'),
+  user_uuid: uuid('user_uuid').references(() => users.uuid),
+  creator_uuid: uuid('creator_uuid')
+    .notNull()
+    .references(() => users.uuid),
+})
+
+export const ticketsRelations = relations(tickets, ({ one }) => ({
+  ticketAssignee: one(users, {
+    fields: [tickets.user_uuid],
+    references: [users.uuid],
+    relationName: 'ticket_assignee',
+  }),
+  ticketCreator: one(users, {
+    fields: [tickets.creator_uuid],
+    references: [users.uuid],
+    relationName: 'ticket_creator',
   }),
 }))

@@ -17,11 +17,6 @@ export const csvWorkerSetup = (fastify: FastifyInstance) => {
     throw new Error('DATABASE_URL is not set')
   }
 
-  console.log(
-    'process.env.DATABASE_URL before worker',
-    process.env.DATABASE_URL
-  )
-
   return new Worker(
     'csvQueue',
     async (job: Job) => {
