@@ -29,8 +29,7 @@ const ticketsRoutes = (
       preHandler: fastify.auth([fastify.isUserLoggedIn]),
     },
     async (_, reply) => {
-      const tickets = getTicketsHandler(fastify)
-
+      const tickets = await getTicketsHandler(fastify)
       const transformedResponse = transformResponse(tickets)
 
       reply.send(transformedResponse)

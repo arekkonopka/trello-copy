@@ -32,7 +32,9 @@ const logInUser = async (fastify: FastifyInstance) => {
   return {
     userCredentials: credentials.rows[0],
     sessionCookie: cookie,
-    userData: user as TUserSchema,
+    userData: { ...user, password: userData.password } as TUserSchema & {
+      password: string
+    },
   }
 }
 

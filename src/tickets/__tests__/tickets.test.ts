@@ -95,22 +95,24 @@ describe('tickets', () => {
         .get('/tickets')
         .set('Cookie', sessionCookie)
 
-      expect(response.body).toEqual([
-        {
-          ...ticket1,
-          created_at: expect.any(String),
-          updated_at: expect.any(String),
-          uuid: expect.any(String),
-          user_uuid: null,
-        },
-        {
-          ...ticket2,
-          created_at: expect.any(String),
-          updated_at: expect.any(String),
-          uuid: expect.any(String),
-          user_uuid: null,
-        },
-      ])
+      expect(response.body).toEqual({
+        data: [
+          {
+            ...ticket1,
+            created_at: expect.any(String),
+            updated_at: expect.any(String),
+            uuid: expect.any(String),
+            user_uuid: null,
+          },
+          {
+            ...ticket2,
+            created_at: expect.any(String),
+            updated_at: expect.any(String),
+            uuid: expect.any(String),
+            user_uuid: null,
+          },
+        ],
+      })
     })
   })
 
@@ -161,15 +163,17 @@ describe('tickets', () => {
         .get(`/tickets/${ticketResponse.rows[0].uuid}`)
         .set('Cookie', sessionCookie)
 
-      expect(response.body).toEqual([
-        {
-          ...ticket,
-          created_at: expect.any(String),
-          updated_at: expect.any(String),
-          uuid: expect.any(String),
-          user_uuid: null,
-        },
-      ])
+      expect(response.body).toEqual({
+        data: [
+          {
+            ...ticket,
+            created_at: expect.any(String),
+            updated_at: expect.any(String),
+            uuid: expect.any(String),
+            user_uuid: null,
+          },
+        ],
+      })
     })
   })
 
@@ -313,7 +317,7 @@ describe('tickets', () => {
     })
   })
 
-  describe.only('/DELETE tickets/:uuid', () => {
+  describe('/DELETE tickets/:uuid', () => {
     it('should return unauthorized', async () => {
       const response = await request(fastify.server)
         .delete('/tickets/0e4adf5a-fcbb-4034-ac21-a15a761705ec')
