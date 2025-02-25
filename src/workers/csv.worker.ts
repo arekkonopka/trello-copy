@@ -20,11 +20,6 @@ export const csvWorkerSetup = (fastify: FastifyInstance) => {
   return new Worker(
     'csvQueue',
     async (job: Job) => {
-      console.log(
-        'process.env.DATABASE_URL inside Worker',
-        process.env.DATABASE_URL
-      )
-
       await createJob(fastify.db, {
         uuid: job.id as string,
         name: job.name,
