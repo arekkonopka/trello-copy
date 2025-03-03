@@ -64,13 +64,13 @@ describe('attachments', () => {
   afterAll(async () => {
     await fastify.close()
     await pgContainer.stop()
-    s3Mock.reset()
   })
 
   afterEach(async () => {
     await fastify.db.execute(sql`TRUNCATE TABLE users CASCADE`)
     await fastify.db.execute(sql`TRUNCATE TABLE tickets CASCADE`)
     await fastify.db.execute(sql`TRUNCATE TABLE attachments CASCADE`)
+    s3Mock.reset()
   })
 
   describe('POST /attachments', () => {
