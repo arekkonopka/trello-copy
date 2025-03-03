@@ -70,7 +70,7 @@ describe('tickets', () => {
       })
     })
 
-    it('should return tickets', async () => {
+    it('should return tickets with no attachments', async () => {
       const { sessionCookie, userData } = await logInUser(fastify)
 
       const ticket1 = {
@@ -103,6 +103,7 @@ describe('tickets', () => {
             updated_at: expect.any(String),
             uuid: expect.any(String),
             user_uuid: null,
+            attachments: [],
           },
           {
             ...ticket2,
@@ -110,6 +111,75 @@ describe('tickets', () => {
             updated_at: expect.any(String),
             uuid: expect.any(String),
             user_uuid: null,
+            attachments: [],
+          },
+        ],
+      })
+    })
+
+    it('should return tickets with assigned attachments', async () => {
+      const { sessionCookie, userData } = await logInUser(fastify)
+
+      const ticket1 = {
+        title: 'test title',
+        description: 'test description',
+        creator_uuid: userData.uuid,
+      }
+
+      const ticket2 = {
+        title: 'test title 2',
+        description: 'test description 2',
+        creator_uuid: userData.uuid,
+      }
+
+      const ticketsResponse = await fastify.db.execute(sql`
+        INSERT INTO tickets (title, description, creator_uuid)
+        VALUES (${ticket1.title}, ${ticket1.description}, ${ticket1.creator_uuid}),
+        (${ticket2.title}, ${ticket2.description}, ${ticket2.creator_uuid})
+        RETURNING *
+        `)
+
+      const attachment = {
+        file_type: 'text/plain',
+        ticket_uuid: ticketsResponse.rows[0].uuid,
+      }
+
+      await fastify.db.execute(sql`
+        INSERT INTO attachments ( file_type, ticket_uuid)
+        VALUES (${attachment.file_type}, ${attachment.ticket_uuid})
+      `)
+
+      const response = await request(fastify.server)
+        .get('/tickets')
+        .set('Cookie', sessionCookie)
+
+      expect(response.body).toEqual({
+        data: [
+          {
+            ...ticket1,
+            created_at: expect.any(String),
+            updated_at: expect.any(String),
+            uuid: expect.any(String),
+            user_uuid: null,
+            attachments: [
+              {
+                ...attachment,
+                created_at: expect.any(String),
+                updated_at: expect.any(String),
+                uuid: expect.any(String),
+                url: null,
+                file_name: null,
+                file_size: null,
+              },
+            ],
+          },
+          {
+            ...ticket2,
+            created_at: expect.any(String),
+            updated_at: expect.any(String),
+            uuid: expect.any(String),
+            user_uuid: null,
+            attachments: [],
           },
         ],
       })
@@ -203,8 +273,6 @@ describe('tickets', () => {
         .post('/tickets')
         .set('Cookie', sessionCookie)
         .send(ticket)
-
-      console.log('response.body', response.body)
 
       expect(response.statusCode).toBe(200)
       expect(response.body).toEqual({

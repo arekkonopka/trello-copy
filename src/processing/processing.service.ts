@@ -38,11 +38,6 @@ export const createJob = async (
   db: PostgresJsDatabase<typeof schema>,
   data: TUpdateJob
 ) => {
-  console.log(
-    'process.env.DATABASE_URL create createJob ',
-    process.env.DATABASE_URL
-  )
-
   const existingJob = await getJobById(db, data.uuid)
   if (existingJob) {
     throw httpErrors.badRequest('Job already exists')

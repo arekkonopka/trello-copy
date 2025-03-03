@@ -17,6 +17,7 @@ import fastifyMultipart from '@fastify/multipart'
 import queuePlugin from './plugins/queue.plugin.js'
 import { csvWorkerSetup } from './workers/csv.worker.js'
 import ticketsRoutes from './tickets/tickets.routes.js'
+import attachmentsRoutes from './attachments/attachments.routes.js'
 
 dotenv.config()
 
@@ -66,6 +67,7 @@ const buildServer = (config = {}): FastifyInstance => {
   fastify.register(usersRoutes)
   fastify.register(authRoutes)
   fastify.register(ticketsRoutes)
+  fastify.register(attachmentsRoutes)
 
   fastify.ready().then(() => {
     csvWorkerSetup(fastify)

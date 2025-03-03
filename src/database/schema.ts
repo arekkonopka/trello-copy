@@ -1,4 +1,11 @@
-import { pgTable, uuid, varchar, boolean, jsonb } from 'drizzle-orm/pg-core'
+import {
+  pgTable,
+  uuid,
+  varchar,
+  boolean,
+  jsonb,
+  integer,
+} from 'drizzle-orm/pg-core'
 import { createdAt, updatedAt } from './utils'
 import { relations, sql } from 'drizzle-orm'
 import { timestamp } from 'drizzle-orm/pg-core'
@@ -104,7 +111,7 @@ export const tickets = pgTable('tickets', {
     .references(() => users.uuid),
 })
 
-export const ticketsRelations = relations(tickets, ({ one }) => ({
+export const ticketsRelations = relations(tickets, ({ one, many }) => ({
   ticketAssignee: one(users, {
     fields: [tickets.user_uuid],
     references: [users.uuid],
@@ -114,5 +121,28 @@ export const ticketsRelations = relations(tickets, ({ one }) => ({
     fields: [tickets.creator_uuid],
     references: [users.uuid],
     relationName: 'ticket_creator',
+  }),
+  attachments: many(attachments),
+}))
+
+export const attachments = pgTable('attachments', {
+  ...createdAt,
+  ...updatedAt,
+  uuid: uuid('uuid')
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  ticket_uuid: uuid('ticket_uuid')
+    .notNull()
+    .references(() => tickets.uuid),
+  url: varchar('url'),
+  file_name: varchar('file_name'),
+  file_type: varchar('file_type'),
+  file_size: integer('file_size'),
+})
+
+export const attachmentsRelations = relations(attachments, ({ one }) => ({
+  ticket: one(tickets, {
+    fields: [attachments.ticket_uuid],
+    references: [tickets.uuid],
   }),
 }))

@@ -6,11 +6,11 @@ import { getUserBySessionId } from '../auth/auth.service'
 import { TUpdateTicketSchema } from './schema/update-ticket.schema'
 
 export const getTicketsHandler = async (app: FastifyInstance) => {
-  const response = await app.db.execute(sql`
-    SELECT * FROM tickets
-    `)
+  const response = app.db.query.tickets.findMany({
+    with: { attachments: true },
+  })
 
-  return response.rows
+  return response
 }
 
 export const getTicketHandler = async (app: FastifyInstance, uuid: string) => {

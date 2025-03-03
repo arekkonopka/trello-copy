@@ -1,6 +1,8 @@
-import { Type } from '@sinclair/typebox'
 import { FastifyInstance } from 'fastify'
-import { ticketSchema } from './schema/ticket.schema'
+import {
+  ticketSchema,
+  ticketSchemaWithAttachments,
+} from './schema/ticket.schema'
 import { errorSchema } from '../users/schema/error.schema'
 import {
   deleteTicketHandler,
@@ -22,7 +24,7 @@ const ticketsRoutes = (
     {
       schema: {
         response: {
-          200: responseSchema(ticketSchema),
+          200: responseSchema(ticketSchemaWithAttachments),
           401: errorSchema,
         },
       },
