@@ -13,6 +13,15 @@ import {
 } from './tickets.service'
 import { responseSchema } from '../schema/response.schema'
 import { transformResponse } from '../utils/transformResponse'
+import {
+  createTicketSchema,
+  TCreateTicketSchema,
+} from './schema/create-ticket.schema'
+import {
+  TUpdateTicketSchema,
+  updateTicketSchema,
+} from './schema/update-ticket.schema'
+import { Type } from '@sinclair/typebox'
 
 const ticketsRoutes = (
   fastify: FastifyInstance,
@@ -60,10 +69,12 @@ const ticketsRoutes = (
     }
   )
 
-  fastify.post(
+  fastify.post<{ Body: TCreateTicketSchema }>(
     '/tickets',
     {
       schema: {
+        body: createTicketSchema,
+
         response: {
           200: responseSchema(ticketSchema),
           404: errorSchema,
@@ -79,14 +90,18 @@ const ticketsRoutes = (
     }
   )
 
-  fastify.patch(
+  fastify.patch<{ Body: TUpdateTicketSchema; Params: { uuid: string } }>(
     '/tickets/:uuid',
     {
       schema: {
+        body: updateTicketSchema,
         response: {
           200: responseSchema(ticketSchema),
           404: errorSchema,
         },
+        params: Type.Object({
+          uuid: Type.String({ format: 'uuid' }),
+        }),
       },
       preHandler: fastify.auth([fastify.isUserLoggedIn]),
     },
@@ -98,7 +113,7 @@ const ticketsRoutes = (
     }
   )
 
-  fastify.delete(
+  fastify.delete<{ Params: { uuid: string } }>(
     '/tickets/:uuid',
     {
       schema: {
@@ -106,6 +121,9 @@ const ticketsRoutes = (
           200: responseSchema(ticketSchema),
           404: errorSchema,
         },
+        params: Type.Object({
+          uuid: Type.String({ format: 'uuid' }),
+        }),
       },
       preHandler: fastify.auth([fastify.isUserLoggedIn]),
     },

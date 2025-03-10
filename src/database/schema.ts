@@ -5,6 +5,7 @@ import {
   boolean,
   jsonb,
   integer,
+  text,
 } from 'drizzle-orm/pg-core'
 import { createdAt, updatedAt } from './utils'
 import { relations, sql } from 'drizzle-orm'
@@ -104,8 +105,8 @@ export const tickets = pgTable('tickets', {
     .default(sql`gen_random_uuid()`)
     .primaryKey(),
   title: varchar('title'),
-  description: varchar('description'),
-  user_uuid: uuid('user_uuid').references(() => users.uuid),
+  description: text('description'),
+  assignee_uuid: uuid('assignee_uuid').references(() => users.uuid),
   creator_uuid: uuid('creator_uuid')
     .notNull()
     .references(() => users.uuid),
@@ -113,7 +114,7 @@ export const tickets = pgTable('tickets', {
 
 export const ticketsRelations = relations(tickets, ({ one, many }) => ({
   ticketAssignee: one(users, {
-    fields: [tickets.user_uuid],
+    fields: [tickets.assignee_uuid],
     references: [users.uuid],
     relationName: 'ticket_assignee',
   }),
@@ -134,7 +135,6 @@ export const attachments = pgTable('attachments', {
   ticket_uuid: uuid('ticket_uuid')
     .notNull()
     .references(() => tickets.uuid),
-  url: varchar('url'),
   file_name: varchar('file_name'),
   file_type: varchar('file_type'),
   file_size: integer('file_size'),

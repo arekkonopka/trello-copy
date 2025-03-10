@@ -16,6 +16,7 @@ import { sql } from 'drizzle-orm'
 import { FastifyInstance } from 'fastify'
 import logInUser from '../../database/helpers/loginUser'
 import * as emailService from '../../email/email.service'
+import { createTicket } from '../../factories/ticket.factory'
 
 describe('tickets', () => {
   let pgContainer: StartedTestContainer
@@ -73,23 +74,13 @@ describe('tickets', () => {
     it('should return tickets with no attachments', async () => {
       const { sessionCookie, userData } = await logInUser(fastify)
 
-      const ticket1 = {
-        title: 'test title',
-        description: 'test description',
+      const ticket1 = await createTicket(fastify.db, {
         creator_uuid: userData.uuid,
-      }
+      })
 
-      const ticket2 = {
-        title: 'test title 2',
-        description: 'test description 2',
+      const ticket2 = await createTicket(fastify.db, {
         creator_uuid: userData.uuid,
-      }
-
-      await fastify.db.execute(sql`
-        INSERT INTO tickets (title, description, creator_uuid)
-        VALUES (${ticket1.title}, ${ticket1.description}, ${ticket1.creator_uuid}),
-        (${ticket2.title}, ${ticket2.description}, ${ticket2.creator_uuid})
-        `)
+      })
 
       const response = await request(fastify.server)
         .get('/tickets')
@@ -99,18 +90,10 @@ describe('tickets', () => {
         data: [
           {
             ...ticket1,
-            created_at: expect.any(String),
-            updated_at: expect.any(String),
-            uuid: expect.any(String),
-            user_uuid: null,
             attachments: [],
           },
           {
             ...ticket2,
-            created_at: expect.any(String),
-            updated_at: expect.any(String),
-            uuid: expect.any(String),
-            user_uuid: null,
             attachments: [],
           },
         ],
@@ -120,28 +103,17 @@ describe('tickets', () => {
     it('should return tickets with assigned attachments', async () => {
       const { sessionCookie, userData } = await logInUser(fastify)
 
-      const ticket1 = {
-        title: 'test title',
-        description: 'test description',
+      const ticket1 = await createTicket(fastify.db, {
         creator_uuid: userData.uuid,
-      }
+      })
 
-      const ticket2 = {
-        title: 'test title 2',
-        description: 'test description 2',
+      const ticket2 = await createTicket(fastify.db, {
         creator_uuid: userData.uuid,
-      }
-
-      const ticketsResponse = await fastify.db.execute(sql`
-        INSERT INTO tickets (title, description, creator_uuid)
-        VALUES (${ticket1.title}, ${ticket1.description}, ${ticket1.creator_uuid}),
-        (${ticket2.title}, ${ticket2.description}, ${ticket2.creator_uuid})
-        RETURNING *
-        `)
+      })
 
       const attachment = {
         file_type: 'text/plain',
-        ticket_uuid: ticketsResponse.rows[0].uuid,
+        ticket_uuid: ticket1.uuid,
       }
 
       await fastify.db.execute(sql`
@@ -157,17 +129,12 @@ describe('tickets', () => {
         data: [
           {
             ...ticket1,
-            created_at: expect.any(String),
-            updated_at: expect.any(String),
-            uuid: expect.any(String),
-            user_uuid: null,
             attachments: [
               {
                 ...attachment,
                 created_at: expect.any(String),
                 updated_at: expect.any(String),
                 uuid: expect.any(String),
-                url: null,
                 file_name: null,
                 file_size: null,
               },
@@ -175,10 +142,6 @@ describe('tickets', () => {
           },
           {
             ...ticket2,
-            created_at: expect.any(String),
-            updated_at: expect.any(String),
-            uuid: expect.any(String),
-            user_uuid: null,
             attachments: [],
           },
         ],
@@ -217,30 +180,18 @@ describe('tickets', () => {
     it('should return ticket', async () => {
       const { sessionCookie, userData } = await logInUser(fastify)
 
-      const ticket = {
-        title: 'test title',
-        description: 'test description',
+      const ticket = await createTicket(fastify.db, {
         creator_uuid: userData.uuid,
-      }
-
-      const ticketResponse = await fastify.db.execute(sql`
-        INSERT INTO tickets (title, description, creator_uuid)
-        VALUES (${ticket.title}, ${ticket.description}, ${ticket.creator_uuid})
-        RETURNING *
-        `)
+      })
 
       const response = await request(fastify.server)
-        .get(`/tickets/${ticketResponse.rows[0].uuid}`)
+        .get(`/tickets/${ticket.uuid}`)
         .set('Cookie', sessionCookie)
 
       expect(response.body).toEqual({
         data: [
           {
             ...ticket,
-            created_at: expect.any(String),
-            updated_at: expect.any(String),
-            uuid: expect.any(String),
-            user_uuid: null,
           },
         ],
       })
@@ -282,7 +233,7 @@ describe('tickets', () => {
             created_at: expect.any(String),
             updated_at: expect.any(String),
             uuid: expect.any(String),
-            user_uuid: null,
+            assignee_uuid: null,
             creator_uuid: userData.uuid,
           },
         ],
@@ -309,6 +260,7 @@ describe('tickets', () => {
       const response = await request(fastify.server)
         .patch('/tickets/0e4adf5a-fcbb-4034-ac21-a15a761705eb')
         .set('Cookie', sessionCookie)
+        .send({})
 
       expect(response.statusCode).toBe(404)
       expect(response.body).toEqual({
@@ -321,30 +273,24 @@ describe('tickets', () => {
     it('should update ticket title', async () => {
       const { sessionCookie, userData } = await logInUser(fastify)
 
-      const ticketResponse = await fastify.db.execute(sql`
-        INSERT INTO tickets (title, description, creator_uuid)
-        VALUES ('test title', 'test description', ${userData.uuid})
-        RETURNING *
-        `)
+      const ticket = await createTicket(fastify.db, {
+        creator_uuid: userData.uuid,
+      })
+      const newTitle = 'new title'
 
       const response = await request(fastify.server)
-        .patch(`/tickets/${ticketResponse.rows[0].uuid}`)
+        .patch(`/tickets/${ticket.uuid}`)
         .set('Cookie', sessionCookie)
         .send({
-          title: 'new title',
+          title: newTitle,
         })
 
       expect(response.statusCode).toBe(200)
       expect(response.body).toEqual({
         data: [
           {
-            title: 'new title',
-            description: 'test description',
-            created_at: expect.any(String),
-            updated_at: expect.any(String),
-            uuid: expect.any(String),
-            user_uuid: null,
-            creator_uuid: userData.uuid,
+            ...ticket,
+            title: newTitle,
           },
         ],
       })
@@ -353,11 +299,9 @@ describe('tickets', () => {
     it('should update ticket', async () => {
       const { sessionCookie, userData } = await logInUser(fastify)
 
-      const ticketResponse = await fastify.db.execute(sql`
-        INSERT INTO tickets (title, description, creator_uuid)
-        VALUES ('test title', 'test description', ${userData.uuid})
-        RETURNING *
-        `)
+      const ticket = await createTicket(fastify.db, {
+        creator_uuid: userData.uuid,
+      })
 
       const ticketUpdateBody = {
         title: 'new title',
@@ -365,7 +309,7 @@ describe('tickets', () => {
       }
 
       const response = await request(fastify.server)
-        .patch(`/tickets/${ticketResponse.rows[0].uuid}`)
+        .patch(`/tickets/${ticket.uuid}`)
         .set('Cookie', sessionCookie)
         .send(ticketUpdateBody)
 
@@ -373,12 +317,8 @@ describe('tickets', () => {
       expect(response.body).toEqual({
         data: [
           {
+            ...ticket,
             ...ticketUpdateBody,
-            created_at: expect.any(String),
-            updated_at: expect.any(String),
-            uuid: expect.any(String),
-            user_uuid: null,
-            creator_uuid: userData.uuid,
           },
         ],
       })
@@ -404,6 +344,7 @@ describe('tickets', () => {
       const response = await request(fastify.server)
         .patch('/tickets/0e4adf5a-fcbb-4034-ac21-a15a761705eb')
         .set('Cookie', sessionCookie)
+        .send({})
 
       expect(response.statusCode).toBe(404)
       expect(response.body).toEqual({
@@ -416,33 +357,17 @@ describe('tickets', () => {
     it('should delete ticket', async () => {
       const { sessionCookie, userData } = await logInUser(fastify)
 
-      const ticket = {
-        title: 'test ticket',
-        description: 'test description',
+      const ticket = await createTicket(fastify.db, {
         creator_uuid: userData.uuid,
-      }
-
-      const ticketResponse = await fastify.db.execute(sql`
-        INSERT INTO tickets (title, description, creator_uuid)
-        VALUES (${ticket.title}, ${ticket.description}, ${ticket.creator_uuid})
-        RETURNING *
-        `)
+      })
 
       const response = await request(fastify.server)
-        .delete(`/tickets/${ticketResponse.rows[0].uuid}`)
+        .delete(`/tickets/${ticket.uuid}`)
         .set('Cookie', sessionCookie)
 
       expect(response.statusCode).toBe(200)
       expect(response.body).toEqual({
-        data: [
-          {
-            ...ticket,
-            created_at: expect.any(String),
-            updated_at: expect.any(String),
-            uuid: expect.any(String),
-            user_uuid: null,
-          },
-        ],
+        data: [ticket],
       })
 
       const tickets = await fastify.db.execute(sql`

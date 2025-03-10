@@ -1,9 +1,8 @@
 import { Static, Type } from '@sinclair/typebox'
 
 export const updateTicketSchema = Type.Object({
-  title: Type.String(),
-  description: Type.String(),
-  uuid: Type.String(),
+  title: Type.Optional(Type.String()),
+  description: Type.Optional(Type.String()),
 })
 
 export type TUpdateTicketSchema = Static<typeof updateTicketSchema>

@@ -133,7 +133,9 @@ describe('attachments', () => {
             file_type: 'application/octet-stream',
             file_size: null,
             ticket_uuid: ticket_uuid,
-            url: expect.any(String),
+            url: expect.stringMatching(
+              /^https:\/\/[a-zA-Z0-9-]+\.s3\.us-east-1\.amazonaws\.com\/[a-zA-Z0-9-]+$/
+            ),
             uuid: expect.any(String),
           },
         ],

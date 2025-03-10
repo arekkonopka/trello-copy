@@ -4,7 +4,10 @@ import {
   postAttachmentsHandler,
 } from './attachments.service'
 import { responseSchema } from '../schema/response.schema'
-import { attachmentsSchema } from './schema/attachments.schema'
+import {
+  attachmentSchemaWithUrl,
+  attachmentsSchema,
+} from './schema/attachments.schema'
 import { transformResponse } from '../utils/transformResponse'
 import { errorSchema } from '../users/schema/error.schema'
 
@@ -18,7 +21,7 @@ const attachmentsRoutes = (
     {
       schema: {
         response: {
-          201: responseSchema(attachmentsSchema),
+          201: responseSchema(attachmentSchemaWithUrl),
           404: errorSchema,
         },
       },

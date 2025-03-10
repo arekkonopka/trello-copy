@@ -68,12 +68,12 @@ export const postAttachmentsHandler = async (
   const url = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_LOCATION}.amazonaws.com/${s3key}`
 
   const result = await app.db.execute(sql`
-    INSERT INTO attachments (ticket_uuid, file_name, file_type, uuid, url)
-    VALUES (${ticket_uuid}, ${data.filename}, ${data.mimetype}, ${s3key}, ${url})
+    INSERT INTO attachments (ticket_uuid, file_name, file_type, uuid)
+    VALUES (${ticket_uuid}, ${data.filename}, ${data.mimetype}, ${s3key})
     RETURNING *
     `)
 
-  return result.rows
+  return [{ ...result.rows[0], url }]
 
   // way to return signed url
 

@@ -28,7 +28,7 @@ export const getTicketHandler = async (app: FastifyInstance, uuid: string) => {
 
 export const postTicketHandler = async (
   app: FastifyInstance,
-  request: FastifyRequest
+  request: FastifyRequest<{ Body: TCreateTicketSchema }>
 ) => {
   const sessionId = request.session?.sessionId
   const user = await getUserBySessionId(app.db, sessionId)
@@ -37,7 +37,7 @@ export const postTicketHandler = async (
     throw httpErrors.notFound('User not found')
   }
 
-  const ticketData = request.body as TCreateTicketSchema
+  const ticketData = request.body
 
   const result = await app.db.execute(sql`
       INSERT INTO tickets (title, description, creator_uuid)
@@ -50,7 +50,10 @@ export const postTicketHandler = async (
 
 export const patchTicketHandler = async (
   app: FastifyInstance,
-  request: FastifyRequest
+  request: FastifyRequest<{
+    Body: TUpdateTicketSchema
+    Params: { uuid: string }
+  }>
 ) => {
   const sessionId = request.session?.sessionId
   const user = await getUserBySessionId(app.db, sessionId)
@@ -59,8 +62,8 @@ export const patchTicketHandler = async (
     throw httpErrors.notFound('User not found')
   }
 
-  const ticketData = request.body as TUpdateTicketSchema
-  const { uuid } = request.params as { uuid: string }
+  const ticketData = request.body
+  const { uuid } = request.params
 
   await getTicketHandler(app, uuid)
 
@@ -79,7 +82,7 @@ export const patchTicketHandler = async (
 
 export const deleteTicketHandler = async (
   app: FastifyInstance,
-  request: FastifyRequest
+  request: FastifyRequest<{ Params: { uuid: string } }>
 ) => {
   const { uuid } = request.params as { uuid: string }
 
