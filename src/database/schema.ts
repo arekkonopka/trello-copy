@@ -1,4 +1,12 @@
-import { pgTable, uuid, varchar, boolean } from 'drizzle-orm/pg-core'
+import {
+  pgTable,
+  uuid,
+  varchar,
+  boolean,
+  jsonb,
+  integer,
+  text,
+} from 'drizzle-orm/pg-core'
 import { createdAt, updatedAt } from './utils'
 import { relations, sql } from 'drizzle-orm'
 import { timestamp } from 'drizzle-orm/pg-core'
@@ -18,6 +26,13 @@ export const users = pgTable('users', {
 export const usersRelations = relations(users, ({ one, many }) => ({
   auth: one(auth),
   session: many(session),
+  jobs: many(jobs),
+  ticketAssignee: many(tickets, {
+    relationName: 'ticket_assignee',
+  }),
+  ticket_creator: many(tickets, {
+    relationName: 'ticket_creator',
+  }),
 }))
 
 export const auth = pgTable('auth', {
@@ -59,5 +74,75 @@ export const sessionRelations = relations(session, ({ one }) => ({
   user: one(users, {
     fields: [session.user_uuid],
     references: [users.uuid],
+  }),
+}))
+
+export const jobs = pgTable('jobs', {
+  ...createdAt,
+  uuid: uuid('uuid')
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  user_uuid: uuid('user_uuid')
+    .notNull()
+    .references(() => users.uuid),
+  name: varchar('name'),
+  status: varchar('status').notNull(),
+  data: jsonb('data'),
+  errors: jsonb('errors'),
+})
+
+export const jobsRelations = relations(jobs, ({ one }) => ({
+  user: one(users, {
+    fields: [jobs.user_uuid],
+    references: [users.uuid],
+  }),
+}))
+
+export const tickets = pgTable('tickets', {
+  ...createdAt,
+  ...updatedAt,
+  uuid: uuid('uuid')
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  title: varchar('title'),
+  description: text('description'),
+  assignee_uuid: uuid('assignee_uuid').references(() => users.uuid),
+  creator_uuid: uuid('creator_uuid')
+    .notNull()
+    .references(() => users.uuid),
+})
+
+export const ticketsRelations = relations(tickets, ({ one, many }) => ({
+  ticketAssignee: one(users, {
+    fields: [tickets.assignee_uuid],
+    references: [users.uuid],
+    relationName: 'ticket_assignee',
+  }),
+  ticketCreator: one(users, {
+    fields: [tickets.creator_uuid],
+    references: [users.uuid],
+    relationName: 'ticket_creator',
+  }),
+  attachments: many(attachments),
+}))
+
+export const attachments = pgTable('attachments', {
+  ...createdAt,
+  ...updatedAt,
+  uuid: uuid('uuid')
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  ticket_uuid: uuid('ticket_uuid')
+    .notNull()
+    .references(() => tickets.uuid),
+  file_name: varchar('file_name'),
+  file_type: varchar('file_type'),
+  file_size: integer('file_size'),
+})
+
+export const attachmentsRelations = relations(attachments, ({ one }) => ({
+  ticket: one(tickets, {
+    fields: [attachments.ticket_uuid],
+    references: [tickets.uuid],
   }),
 }))

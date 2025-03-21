@@ -1,10 +1,12 @@
 import { eq, sql } from 'drizzle-orm'
-import { FastifyInstance } from 'fastify'
+import { FastifyInstance, FastifyRequest } from 'fastify'
 import { CreateUser } from './schema/create-user.schema'
 import { users } from '../database/schema'
 import { TUpdateUser } from './schema/update-user.schema'
 import { httpErrors } from '@fastify/sensible'
 import { TGetUsersParams } from './schema/get-users.schema.js'
+import { randomUUID } from 'crypto'
+import { getUserBySessionId } from '../auth/auth.service'
 
 export const getUsers = async (
   app: FastifyInstance,
@@ -85,14 +87,15 @@ export const findUserByEmail = async (app: FastifyInstance, email: string) => {
 
 export const createUser = async (app: FastifyInstance, user: CreateUser) => {
   const currentUser = await findUserByEmail(app, user.email)
-
   if (currentUser.length) {
     throw httpErrors.badRequest('User already exists')
   }
 
   const result = await app.db.execute(sql`
-    INSERT INTO users (first_name, last_name, email)
-    VALUES (${user.first_name}, ${user.last_name}, ${user.email})
+    INSERT INTO users (first_name, last_name, email, avatar_url)
+    VALUES (${user.first_name}, ${user.last_name}, ${user.email}, ${
+    user?.avatar_url ?? null
+  })
     RETURNING *
     `)
 
@@ -129,4 +132,98 @@ export const deleteUser = async (app: FastifyInstance, uuid: string) => {
   }
 
   return result
+}
+
+export const csvUploadHandler = async (
+  app: FastifyInstance,
+  request: FastifyRequest
+) => {
+  const data = await request.file()
+  const sessionId = request.session?.sessionId
+  const user = await getUserBySessionId(app.db, sessionId)
+
+  if (!user) {
+    throw httpErrors.notFound('User not found')
+  }
+
+  if (!data) {
+    throw httpErrors.badRequest('no file uploaded')
+  }
+
+  if (data.mimetype !== 'text/csv') {
+    throw httpErrors.unsupportedMediaType(
+      'Invalid file type. Only CSV files are allowed.'
+    )
+  }
+
+  const csv = await new Promise<string>((resolve, reject) => {
+    const chunks: Buffer[] = []
+    data.file.on('data', (chunk) => chunks.push(chunk))
+    data.file.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+    data.file.on('error', (err) => reject(err))
+  })
+
+  const jobId = randomUUID()
+
+  await app.csvQueue.add(
+    'parseCsv',
+    { csv, user_uuid: user.user_uuid },
+    { jobId, removeOnComplete: true, removeOnFail: true }
+  )
+
+  return jobId
+
+  // OLD PARSING, without queues
+
+  // const parsed = Papa.parse<CreateUser>(csv, {
+  //   header: true,
+  //   skipEmptyLines: true,
+  //   dynamicTyping: true,
+  //   complete: function (results) {
+  //     const isValidHeaders = csvValidation.validateHeaders(
+  //       results?.meta?.fields || []
+  //     )
+
+  //     if (!isValidHeaders) {
+  //       throw httpErrors.badRequest('Invalid headers')
+  //     }
+
+  //     const rowsErrors = csvValidation.validateRow(results.data as CreateUser[])
+
+  //     if (rowsErrors.length) {
+  //       const errorMessage = rowsErrors.map((error) => {
+  //         if (error) {
+  //           const field = error.error?.[0].instancePath.replace('/', '')
+  //           return `Row ${error?.index + 1}: Field '${field}' ${
+  //             error.error?.[0].message
+  //           }.`
+  //         }
+  //       })
+  //       throw httpErrors.badRequest(JSON.stringify(errorMessage))
+  //     }
+  //   },
+  // })
+
+  // if (parsed.errors.length) {
+  //   const errorMessage = parsed.errors.map((error) => {
+  //     return `Row: ${error.row} has ${error.message}`
+  //   })
+
+  //   throw httpErrors.badRequest(JSON.stringify(errorMessage))
+  // }
+
+  // const users = await app.db.execute(sql`
+  //   INSERT INTO users (first_name, last_name, email, avatar_url)
+  //   VALUES
+  //   ${sql.join(
+  //     parsed.data.map(
+  //       (user) =>
+  //         sql`(${user.first_name}, ${user.last_name}, ${user.email}, ${user.avatar_url})`
+  //     ),
+  //     sql`, `
+  //   )}
+  //   RETURNING *
+  // `)
+
+  // return users.rows
 }

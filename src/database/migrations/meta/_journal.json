@@ -99,6 +99,34 @@
       "when": 1736678392743,
       "tag": "0013_thick_hex",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1738654272118,
+      "tag": "0014_regular_guardian",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1740397253826,
+      "tag": "0015_far_chamber",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1740576732843,
+      "tag": "0016_zippy_lucky_pierre",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1741598991754,
+      "tag": "0017_tan_alice",
+      "breakpoints": true
     }
   ]
 }

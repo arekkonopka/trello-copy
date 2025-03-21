@@ -18,19 +18,25 @@ import { createUsers } from '../../database/helpers/createUsers'
 import { createUser } from '../../database/helpers/createUser'
 import logInUser from '../../database/helpers/loginUser'
 import * as emailService from '../../email/email.service'
+import fs from 'fs'
+import path from 'path'
+import { EOL } from 'os'
 
 describe('users', () => {
-  let container: StartedTestContainer
+  let pgContainer: StartedTestContainer
+  let redisContainer: StartedTestContainer
   let fastify: FastifyInstance
 
   beforeAll(async () => {
-    // ASK: W jaki sposob mockuje sie takie rzeczy jak email?
-    // Jak wyglada obsluga email? Czy smtp bierze sie np z MailTrap?
     vi.spyOn(emailService, 'sendEmail').mockImplementation(() =>
       Promise.resolve()
     )
 
-    container = await new GenericContainer('postgres:16')
+    redisContainer = await new GenericContainer('redis:7')
+      .withExposedPorts(6379)
+      .start()
+
+    pgContainer = await new GenericContainer('postgres:16')
       .withExposedPorts(5432)
       .withEnvironment({
         POSTGRES_USER: 'test',
@@ -39,11 +45,12 @@ describe('users', () => {
       })
       .start()
 
-    const connectionString = `postgresql://test:test@${container.getHost()}:${container.getMappedPort(
+    const connectionString = `postgresql://test:test@${pgContainer.getHost()}:${pgContainer.getMappedPort(
       5432
     )}/test`
 
     process.env.DATABASE_URL = connectionString
+
     fastify = buildServer()
     await fastify.ready()
 
@@ -54,12 +61,14 @@ describe('users', () => {
 
   afterAll(async () => {
     await fastify.close()
-    await container.stop()
+    await pgContainer.stop()
+    await redisContainer.stop()
   })
 
   afterEach(async () => {
     await fastify.db.execute(sql`TRUNCATE TABLE users CASCADE`)
     await fastify.db.execute(sql`TRUNCATE TABLE session CASCADE`)
+    await fastify.db.execute(sql`TRUNCATE TABLE jobs CASCADE`)
   })
 
   describe('/GET users', () => {
@@ -398,6 +407,332 @@ describe('users', () => {
         updated_at: expect.any(String),
         avatar_url: null,
       })
+    })
+
+    describe.skip('OLD csv upload without queue', () => {
+      it('test', async () => {
+        const csv = [
+          'first_name,last_name,email,avatar_url',
+          'John,Doe,john.doe@example.com,https://example.com/avatar1.jpg',
+          'Jane,Smith,jane.smith@example.com,https://example.com/avatar2.jpg',
+        ].join(EOL)
+
+        const filePath = path.resolve(__dirname, 'csv.csv')
+        // create file
+        await fs.promises.writeFile(filePath, csv)
+
+        const response = await request(fastify.server)
+          .post('/users/csv-upload')
+          .attach('file', filePath)
+
+        const jobs = await fastify.db.execute(sql`
+          SELECT * FROM jobs
+          `)
+        // expect(response.body).toBe('ok')
+      })
+
+      it('should return "Invalid file type. Only CSV files are allowed."', async () => {
+        const response = await request(fastify.server)
+          .post('/users/csv-upload')
+          .attach('file', Buffer.from('dummy'), 'test.pdf')
+
+        expect(response.body).toEqual({
+          error: 'Unsupported Media Type',
+          message: 'Invalid file type. Only CSV files are allowed.',
+          statusCode: 415,
+        })
+      })
+
+      it('should return "Invalid headers" because header is missing', async () => {
+        const invalidCSV = [
+          'first_name,last_name,avatar_url,',
+          'John,Doe,john.doe@example.com,https://example.com/avatar1.jpg',
+        ].join(EOL)
+
+        const filePath = path.resolve(__dirname, 'invalid.csv')
+
+        // create file
+        await fs.promises.writeFile(filePath, invalidCSV)
+
+        const response = await request(fastify.server)
+          .post('/users/csv-upload')
+          .attach('file', filePath)
+
+        expect(response.body).toEqual({
+          error: 'Bad Request',
+          message: 'Invalid headers',
+          statusCode: 400,
+        })
+
+        // remove file
+        await fs.promises.unlink(filePath)
+      })
+
+      it('should return "Invalid headers", because incorrect header name', async () => {
+        const invalidCSV = [
+          'first_name,last_nam,email,avatar_url',
+          'John,Doe,john.doe@example.com,https://example.com/avatar1.jpg',
+        ].join(EOL)
+
+        const filePath = path.resolve(__dirname, 'invalid.csv')
+
+        // create file
+        await fs.promises.writeFile(filePath, invalidCSV)
+
+        const response = await request(fastify.server)
+          .post('/users/csv-upload')
+          .attach('file', filePath)
+
+        expect(response.body).toEqual({
+          error: 'Bad Request',
+          message: 'Invalid headers',
+          statusCode: 400,
+        })
+
+        // remove file
+        await fs.promises.unlink(filePath)
+      })
+
+      it('should return missing values', async () => {
+        const invalidCSV = [
+          'first_name,last_name,email,avatar_url',
+          ',Doe,john.doe@example.com,https://example.com/avatar1.jpg,2024-01-01T12:00:00Z,2024-01-01T12:00:00Z',
+          'Jane,Smith,jane.smithexample.com,https://example.com/avatar2.jpg,2024-01-02T15:30:00Z,2024-01-02T15:30:00Z',
+        ].join(EOL)
+
+        const filePath = path.resolve(__dirname, 'invalid.csv')
+
+        // create file
+        await fs.promises.writeFile(filePath, invalidCSV)
+
+        const response = await request(fastify.server)
+          .post('/users/csv-upload')
+          .attach('file', filePath)
+
+        expect(response.body).toEqual({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: `["Row 1: Field 'first_name' must be string.","Row 2: Field 'email' must match format \\"email\\"."]`,
+        })
+
+        // remove file
+        await fs.promises.unlink(filePath)
+      })
+
+      it('should return "Invalid headers" when extra column added', async () => {
+        const invalidCSV = [
+          'first_name,last_name,email,avatar_url,extra column',
+          'John,Doe,john.doe@example.com,https://example.com/avatar1.jpg,2024-01-01T12:00:00Z,2024-01-01T12:00:00Z',
+        ].join(EOL)
+
+        const filePath = path.resolve(__dirname, 'invalid.csv')
+
+        // create file
+        await fs.promises.writeFile(filePath, invalidCSV)
+
+        const response = await request(fastify.server)
+          .post('/users/csv-upload')
+          .attach('file', filePath)
+
+        expect(response.body).toEqual({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: 'Invalid headers',
+        })
+
+        // remove file
+        await fs.promises.unlink(filePath)
+      })
+
+      it('should return "Too many fields" error', async () => {
+        const invalidCSV = [
+          'first_name,last_name,email,avatar_url',
+          'John,Doe,john.doe@example.com,https://example.com/avatar1.jpg,2024-01-01T12:00:00Z,2024-01-01T12:00:00Z',
+          'Jane,Smith,jane.smith@example.com,https://example.com/avatar2.jpg,2024-01-02T15:30:00Z,2024-01-02T15:30:00Z',
+        ].join(EOL)
+
+        const filePath = path.resolve(__dirname, 'invalid.csv')
+
+        // create file
+        await fs.promises.writeFile(filePath, invalidCSV)
+
+        const response = await request(fastify.server)
+          .post('/users/csv-upload')
+          .attach('file', filePath)
+
+        expect(response.body).toEqual({
+          statusCode: 400,
+          error: 'Bad Request',
+          message: `["Row: 0 has Too many fields: expected 4 fields but parsed 6","Row: 1 has Too many fields: expected 4 fields but parsed 6"]`,
+        })
+
+        // remove file
+        await fs.promises.unlink(filePath)
+      })
+
+      it('should upload csv', async () => {
+        const csv = [
+          'first_name,last_name,email,avatar_url',
+          'John,Doe,john.doe@example.com,https://example.com/avatar1.jpg',
+          'Jane,Smith,jane.smith@example.com,https://example.com/avatar2.jpg',
+        ].join(EOL)
+
+        const filePath = path.resolve(__dirname, 'invalid.csv')
+
+        // create file
+        await fs.promises.writeFile(filePath, csv)
+
+        const response = await request(fastify.server)
+          .post('/users/csv-upload')
+          .attach('file', filePath)
+
+        expect(response.body).toHaveLength(2)
+
+        // first user
+        expect(response.body[0]).toHaveProperty('created_at')
+        expect(response.body[0]).toHaveProperty('updated_at')
+        expect(response.body[0]).toHaveProperty('uuid')
+        expect(response.body[0]).toHaveProperty('first_name', 'John')
+        expect(response.body[0]).toHaveProperty('last_name', 'Doe')
+        expect(response.body[0]).toHaveProperty('email', 'john.doe@example.com')
+        expect(response.body[0]).toHaveProperty(
+          'avatar_url',
+          'https://example.com/avatar1.jpg'
+        )
+
+        // second user
+        expect(response.body[1]).toHaveProperty('created_at')
+        expect(response.body[1]).toHaveProperty('updated_at')
+        expect(response.body[1]).toHaveProperty('uuid')
+        expect(response.body[1]).toHaveProperty('first_name', 'Jane')
+        expect(response.body[1]).toHaveProperty('last_name', 'Smith')
+        expect(response.body[1]).toHaveProperty(
+          'email',
+          'jane.smith@example.com'
+        )
+        expect(response.body[1]).toHaveProperty(
+          'avatar_url',
+          'https://example.com/avatar2.jpg'
+        )
+
+        // remove file
+        await fs.promises.unlink(filePath)
+      })
+
+      it('should upload csv without optional field', async () => {
+        const csv = [
+          'first_name,last_name,email,avatar_url',
+          'John,Doe,john.doe@example.com,',
+        ].join(EOL)
+
+        const filePath = path.resolve(__dirname, 'invalid.csv')
+
+        // create file
+        await fs.promises.writeFile(filePath, csv)
+
+        const response = await request(fastify.server)
+          .post('/users/csv-upload')
+          .attach('file', filePath)
+
+        expect(response.body).toHaveLength(1)
+
+        expect(response.body[0]).toHaveProperty('created_at')
+        expect(response.body[0]).toHaveProperty('updated_at')
+        expect(response.body[0]).toHaveProperty('uuid')
+        expect(response.body[0]).toHaveProperty('first_name', 'John')
+        expect(response.body[0]).toHaveProperty('last_name', 'Doe')
+        expect(response.body[0]).toHaveProperty('email', 'john.doe@example.com')
+        expect(response.body[0]).toHaveProperty('avatar_url', null)
+
+        // remove file
+        await fs.promises.unlink(filePath)
+      })
+    })
+  })
+
+  describe('/POST csv upload', () => {
+    it('should return "Invalid file type. Only CSV files are allowed."', async () => {
+      const { sessionCookie } = await logInUser(fastify)
+
+      const response = await request(fastify.server)
+        .post('/users/csv-upload')
+        .attach('file', Buffer.from('dummy'), 'test.pdf')
+        .set('Cookie', sessionCookie)
+
+      expect(response.body).toEqual({
+        error: 'Unsupported Media Type',
+        message: 'Invalid file type. Only CSV files are allowed.',
+        statusCode: 415,
+      })
+    })
+
+    it.only('should return "Invalid headers" because header is missing', async () => {
+      const { sessionCookie } = await logInUser(fastify)
+
+      // const user = await fastify.db.execute(sql`SELECT * FROM users`)
+
+      // console.log('user', user.rows)
+
+      // const auth = await fastify.db.execute(sql`SELECT * FROM auth`)
+
+      // console.log('auth', auth.rows)
+
+      const invalidCSV = [
+        'first_name,last_name,avatar_url,',
+        'John,Doe,john.doe@example.com,https://example.com/avatar1.jpg',
+      ].join(EOL)
+
+      const filePath = path.resolve(__dirname, 'invalid.csv')
+
+      // create file
+      await fs.promises.writeFile(filePath, invalidCSV)
+
+      const response = await request(fastify.server)
+        .post('/users/csv-upload')
+        .attach('file', filePath)
+        .set('Cookie', sessionCookie)
+
+      expect(response.body).toEqual({
+        message: 'CSV file uploaded',
+        meta: {
+          jobId: expect.any(String),
+        },
+        statusCode: 202,
+      })
+
+      const jobId = response.body.meta.jobId
+
+      const jobs = await fastify.db.execute(sql`
+        SELECT * FROM jobs
+        `)
+
+      console.log('jobId', jobId)
+
+      console.log('jobs', jobs.rows)
+
+      // remove file
+      await fs.promises.unlink(filePath)
+    })
+
+    it('test', async () => {
+      const csv = [
+        'first_name,last_name,email,avatar_url',
+        'John,Doe,john.doe@example.com,https://example.com/avatar1.jpg',
+        'Jane,Smith,jane.smith@example.com,https://example.com/avatar2.jpg',
+      ].join(EOL)
+
+      const filePath = path.resolve(__dirname, 'csv.csv')
+      // create file
+      await fs.promises.writeFile(filePath, csv)
+
+      const response = await request(fastify.server)
+        .post('/users/csv-upload')
+        .attach('file', filePath)
+
+      const jobs = await fastify.db.execute(sql`
+        SELECT * FROM jobs
+        `)
+      // expect(response.body).toBe('ok')
     })
   })
 

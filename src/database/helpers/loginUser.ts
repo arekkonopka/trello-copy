@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
 import { FastifyInstance } from 'fastify'
 import request from 'supertest'
+import { TUserSchema } from '../../users/schema/user.schema'
 
 const logInUser = async (fastify: FastifyInstance) => {
   // register
@@ -31,7 +32,9 @@ const logInUser = async (fastify: FastifyInstance) => {
   return {
     userCredentials: credentials.rows[0],
     sessionCookie: cookie,
-    userData,
+    userData: { ...user, password: userData.password } as TUserSchema & {
+      password: string
+    },
   }
 }
 
