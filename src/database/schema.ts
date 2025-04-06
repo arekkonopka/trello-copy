@@ -146,3 +146,39 @@ export const attachmentsRelations = relations(attachments, ({ one }) => ({
     references: [tickets.uuid],
   }),
 }))
+
+export const subscriptions = pgTable('subscriptions', {
+  ...createdAt,
+  ...updatedAt,
+  uuid: uuid('uuid')
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  user_uuid: uuid('user_uuid')
+    .notNull()
+    .references(() => users.uuid),
+  stripe_customer_id: text('stripe_customer_id').notNull(),
+  stripe_subscription_id: text('stripe_subscription_id').notNull(),
+  stripe_price_id: text('stripe_price_id').notNull(),
+  subscription_status: text('subscription_status')
+    .notNull()
+    .$type<
+      | 'trialing'
+      | 'active'
+      | 'past_due'
+      | 'canceled'
+      | 'unpaid'
+      | 'incomplete'
+      | 'incomplete_expired'
+    >(),
+  subscription_start_date: timestamp('subscription_start_date').notNull(),
+  subscription_end_date: timestamp('subscription_end_date'),
+  trial_start_date: timestamp('trial_start_date'),
+  trial_end_date: timestamp('trial_end_date'),
+})
+
+export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
+  user: one(users, {
+    fields: [subscriptions.user_uuid],
+    references: [users.uuid],
+  }),
+}))

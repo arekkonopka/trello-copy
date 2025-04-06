@@ -127,6 +127,13 @@
       "when": 1741598991754,
       "tag": "0017_tan_alice",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1743410115880,
+      "tag": "0018_handy_killer_shrike",
+      "breakpoints": true
     }
   ]
 }
