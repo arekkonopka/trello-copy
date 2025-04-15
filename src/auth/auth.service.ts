@@ -52,6 +52,11 @@ export const loginHandler = async (
     throw httpErrors.unauthorized('Invalid credentials')
   }
 
+  ;(request.session as any).user = {
+    uuid: user.uuid,
+    email: user.email,
+  }
+
   await app.db.execute(sql`
     INSERT INTO session (user_uuid, session_id, expires_at)
     VALUES (${user.uuid}, ${session.sessionId}, ${session.cookie.expires})`)
