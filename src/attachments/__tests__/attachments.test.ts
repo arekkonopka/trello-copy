@@ -22,6 +22,7 @@ import {
   DeleteObjectCommand,
 } from '@aws-sdk/client-s3'
 import { mockClient } from 'aws-sdk-client-mock'
+import { seedRolesAndPermissions } from '../../database/seeds/rolesAndPermissions'
 
 vi.mock('@aws-sdk/client-s3')
 
@@ -59,6 +60,8 @@ describe('attachments', () => {
     await migrate(fastify.db, {
       migrationsFolder: './src/database/migrations',
     })
+
+    await seedRolesAndPermissions(fastify.db)
   })
 
   afterAll(async () => {

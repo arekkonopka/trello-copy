@@ -23,6 +23,7 @@ import subscriptionsRoutes from './payments/subscriptions.routes.js'
 import { request } from 'http'
 import { transformResponse } from './utils/transformResponse.js'
 import cors from '@fastify/cors'
+import caslPlugin from './plugins/casl.js'
 
 dotenv.config()
 
@@ -74,16 +75,16 @@ const buildServer = (config = {}): FastifyInstance => {
     credentials: true,
   })
 
-  // decorators
-  fastify.register(isUserLoggedIn)
-  fastify.register(queuePlugin)
-
   // routes
   fastify.register(usersRoutes)
   fastify.register(authRoutes)
   fastify.register(ticketsRoutes)
   fastify.register(attachmentsRoutes)
   fastify.register(subscriptionsRoutes)
+
+  // decorators
+  fastify.register(queuePlugin)
+  fastify.register(caslPlugin)
 
   // fastify.addHook('onSend', (request, reply, payload, done) => {
   //   const transformedResponse = transformResponse(payload)

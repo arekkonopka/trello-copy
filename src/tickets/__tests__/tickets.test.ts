@@ -17,6 +17,7 @@ import { FastifyInstance } from 'fastify'
 import logInUser from '../../database/helpers/loginUser'
 import * as emailService from '../../email/email.service'
 import { createTicket } from '../../factories/ticket.factory'
+import { seedRolesAndPermissions } from '../../database/seeds/rolesAndPermissions'
 
 describe('tickets', () => {
   let pgContainer: StartedTestContainer
@@ -50,6 +51,10 @@ describe('tickets', () => {
     })
   })
 
+  beforeAll(async () => {
+    await seedRolesAndPermissions(fastify.db)
+  })
+
   afterAll(async () => {
     await fastify.close()
     await pgContainer.stop()
@@ -58,6 +63,13 @@ describe('tickets', () => {
   afterEach(async () => {
     await fastify.db.execute(sql`TRUNCATE TABLE users CASCADE`)
     await fastify.db.execute(sql`TRUNCATE TABLE tickets CASCADE`)
+  })
+
+  afterAll(async () => {
+    await fastify.db.execute(sql`TRUNCATE TABLE user_roles CASCADE`)
+    await fastify.db.execute(sql`TRUNCATE TABLE roles CASCADE`)
+    await fastify.db.execute(sql`TRUNCATE TABLE permissions CASCADE`)
+    await fastify.db.execute(sql`TRUNCATE TABLE role_permissions CASCADE`)
   })
 
   describe('GET /tickets', () => {

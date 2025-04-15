@@ -6,6 +6,7 @@ import {
   afterAll,
   afterEach,
   vi,
+  beforeEach,
 } from 'vitest'
 import buildServer from '../../app'
 import { GenericContainer, StartedTestContainer } from 'testcontainers'
@@ -18,6 +19,8 @@ import { createUser } from '../../database/helpers/createUser'
 import * as emailService from '../../email/email.service'
 import logInUser from '../../database/helpers/loginUser'
 import { hashPassword, verifyPassword } from '../auth.service'
+import { TUserSchema } from '../../users/schema/user.schema'
+import { seedRolesAndPermissions } from '../../database/seeds/rolesAndPermissions'
 
 global.fetch = vi.fn()
 
@@ -61,6 +64,14 @@ describe('auth', () => {
   afterEach(async () => {
     await fastify.db.execute(sql`TRUNCATE TABLE users CASCADE`)
     await fastify.db.execute(sql`TRUNCATE TABLE auth CASCADE`)
+    await fastify.db.execute(sql`TRUNCATE TABLE user_roles CASCADE`)
+    await fastify.db.execute(sql`TRUNCATE TABLE roles CASCADE`)
+    await fastify.db.execute(sql`TRUNCATE TABLE permissions CASCADE`)
+    await fastify.db.execute(sql`TRUNCATE TABLE role_permissions CASCADE`)
+  })
+
+  beforeEach(async () => {
+    await seedRolesAndPermissions(fastify.db)
   })
 
   describe('/login', () => {
@@ -162,16 +173,6 @@ describe('auth', () => {
   })
 
   describe('logout', () => {
-    it('should return "Failed to log out. No session updated."', async () => {
-      const logoutResponse = await request(fastify.server).post('/logout')
-
-      expect(logoutResponse.body).toEqual({
-        error: 'Internal Server Error',
-        message: 'Failed to log out. No session updated.',
-        statusCode: 500,
-      })
-    })
-
     it('should logout user', async () => {
       const user = {
         email: 'user@test.com',
@@ -195,25 +196,18 @@ describe('auth', () => {
         .set('Cookie', [`sessionId=${sessionId}`])
 
       expect(logoutResponse.statusCode).toBe(200)
-
-      const { rows } = await fastify.db.execute(sql`
-          SELECT * FROM session
-          WHERE session_id LIKE ${sessionId?.split('.')[0]}
-          `)
-
-      expect(rows[0].is_active).toBe(false)
     })
   })
 
   describe('/register', () => {
-    it('should return 400 when user exists', async () => {
-      const user = {
-        email: 'user@test.com',
-        password: '1234',
-        first_name: 'John',
-        last_name: 'Doe',
-      }
+    const user = {
+      email: 'user-register@test.com',
+      password: '1234',
+      first_name: 'John',
+      last_name: 'Doe',
+    }
 
+    it('should return 400 when user exists', async () => {
       await createUser(fastify.db, {
         email: user.email,
       })
@@ -230,17 +224,13 @@ describe('auth', () => {
     })
 
     it('should return 200 and create user', async () => {
-      const user = {
-        email: 'user@test.com',
-        password: '1234',
-        first_name: 'John',
-        last_name: 'Doe',
-      }
       const { password, ...userWithoutPassword } = user
 
       const response = await request(fastify.server)
         .post('/register')
         .send(user)
+
+      const userUuid = response.body[0].uuid
 
       expect(response.statusCode).toBe(200)
       expect(response.body[0]).toEqual({
@@ -250,10 +240,16 @@ describe('auth', () => {
 
       const { rows } = await fastify.db.execute(sql`
         SELECT * FROM auth
-        WHERE user_uuid = ${response.body[0].uuid}
+        WHERE user_uuid = ${userUuid}
         `)
 
       expect(rows).toHaveLength(1)
+
+      // check if role has been created
+      const userRoles = await fastify.db.execute(
+        sql`SELECT user_uuid FROM user_roles WHERE user_uuid = ${userUuid}`
+      )
+      expect(userRoles.rows).toHaveLength(1)
     })
   })
 

@@ -8,6 +8,10 @@ import { OAuth2Namespace } from '@fastify/oauth2'
 import { Queue } from 'bullmq'
 import { TUserSchema } from '../users/schema/user.schema.js'
 
+import { fastifySession } from '@fastify/session'
+import { fastifyCookie } from '@fastify/cookie'
+import { AppAbility } from './index.js'
+
 declare module 'fastify' {
   export interface FastifyInstance<
     HttpServer = http.Server,
@@ -21,5 +25,13 @@ declare module 'fastify' {
     isUserLoggedIn: (req: FastifyRequest, reply: FastifyReply) => Promise<void>
     user: TUserSchema | null
     stripe: Stripe
+  }
+
+  export interface FastifyRequest {
+    ability: AppAbility
+  }
+
+  export interface Session {
+    user: TUserSchema | null
   }
 }

@@ -21,6 +21,7 @@ import {
 } from './schema/delete-user.params.js'
 import { Type } from '@sinclair/typebox'
 import { errorSchema } from './schema/error.schema.js'
+import { checkAbility } from '../auth/decorators/checkAbility.js'
 
 const usersRoutes = (fastify: FastifyInstance, _: object, done: () => void) => {
   fastify.get(
@@ -33,7 +34,10 @@ const usersRoutes = (fastify: FastifyInstance, _: object, done: () => void) => {
           400: errorSchema,
         },
       },
-      preHandler: fastify.auth([fastify.isUserLoggedIn]),
+      preHandler: [
+        fastify.auth([fastify.isUserLoggedIn]),
+        checkAbility('read', 'user'),
+      ],
     },
     async (request, reply) => {
       const params = request.query as TGetUsersParams
@@ -52,7 +56,10 @@ const usersRoutes = (fastify: FastifyInstance, _: object, done: () => void) => {
           404: errorSchema,
         },
       },
-      preHandler: fastify.auth([fastify.isUserLoggedIn]),
+      preHandler: [
+        fastify.auth([fastify.isUserLoggedIn]),
+        checkAbility('read', 'user'),
+      ],
     },
     async (request, reply) => {
       const { uuid } = request.params as { uuid: string }
@@ -73,7 +80,10 @@ const usersRoutes = (fastify: FastifyInstance, _: object, done: () => void) => {
           400: errorSchema,
         },
       },
-      preHandler: fastify.auth([fastify.isUserLoggedIn]),
+      preHandler: [
+        fastify.auth([fastify.isUserLoggedIn]),
+        checkAbility('create', 'user'),
+      ],
     },
     async (request, reply) => {
       const user = request.body as CreateUser
@@ -94,7 +104,10 @@ const usersRoutes = (fastify: FastifyInstance, _: object, done: () => void) => {
           404: errorSchema,
         },
       },
-      preHandler: fastify.auth([fastify.isUserLoggedIn]),
+      preHandler: [
+        fastify.auth([fastify.isUserLoggedIn]),
+        checkAbility('update', 'user'),
+      ],
     },
     async (request, reply) => {
       const { uuid } = request.params as { uuid: string }
@@ -119,7 +132,10 @@ const usersRoutes = (fastify: FastifyInstance, _: object, done: () => void) => {
           404: errorSchema,
         },
       },
-      preHandler: fastify.auth([fastify.isUserLoggedIn]),
+      preHandler: [
+        fastify.auth([fastify.isUserLoggedIn]),
+        checkAbility('delete', 'user'),
+      ],
     },
     async (request, reply) => {
       const { uuid } = request.params as { uuid: string }

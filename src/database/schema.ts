@@ -6,6 +6,7 @@ import {
   jsonb,
   integer,
   text,
+  primaryKey,
 } from 'drizzle-orm/pg-core'
 import { createdAt, updatedAt } from './utils'
 import { relations, sql } from 'drizzle-orm'
@@ -33,6 +34,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   ticket_creator: many(tickets, {
     relationName: 'ticket_creator',
   }),
+  userRoles: many(userRoles),
 }))
 
 export const auth = pgTable('auth', {
@@ -181,4 +183,84 @@ export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
     fields: [subscriptions.user_uuid],
     references: [users.uuid],
   }),
+}))
+
+export const roles = pgTable('roles', {
+  ...createdAt,
+  ...updatedAt,
+  uuid: uuid('uuid')
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  name: varchar('name').notNull(),
+  description: text('description'),
+})
+
+export const userRoles = pgTable(
+  'user_roles',
+  {
+    user_uuid: uuid('user_uuid')
+      .notNull()
+      .references(() => users.uuid),
+    role_uuid: uuid('role_uuid')
+      .notNull()
+      .references(() => roles.uuid),
+  },
+  (t) => [primaryKey({ columns: [t.user_uuid, t.role_uuid] })]
+)
+
+export const userRolesRelations = relations(userRoles, ({ one }) => ({
+  user: one(users, {
+    fields: [userRoles.user_uuid],
+    references: [users.uuid],
+  }),
+  role: one(roles, {
+    fields: [userRoles.role_uuid],
+    references: [roles.uuid],
+  }),
+}))
+
+export const rolePermissions = pgTable(
+  'role_permissions',
+  {
+    role_uuid: uuid('role_uuid')
+      .notNull()
+      .references(() => roles.uuid),
+    permission_uuid: uuid('permission_uuid')
+      .notNull()
+      .references(() => permissions.uuid),
+  },
+  (t) => [primaryKey({ columns: [t.role_uuid, t.permission_uuid] })]
+)
+
+export const rolePermissionsRelations = relations(
+  rolePermissions,
+  ({ one }) => ({
+    role: one(roles, {
+      fields: [rolePermissions.role_uuid],
+      references: [roles.uuid],
+    }),
+    permission: one(permissions, {
+      fields: [rolePermissions.permission_uuid],
+      references: [permissions.uuid],
+    }),
+  })
+)
+
+export const rolesRelations = relations(roles, ({ many }) => ({
+  userRoles: many(userRoles),
+  rolePermissions: many(rolePermissions),
+}))
+
+export const permissions = pgTable('permissions', {
+  ...createdAt,
+  ...updatedAt,
+  uuid: uuid('uuid')
+    .default(sql`gen_random_uuid()`)
+    .primaryKey(),
+  name: varchar('name').notNull(),
+  description: text('description'),
+})
+
+export const permissionsRelations = relations(permissions, ({ many }) => ({
+  rolePermissions: many(rolePermissions),
 }))
