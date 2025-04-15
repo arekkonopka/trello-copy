@@ -21,6 +21,8 @@ export const createUser = async (
     INSERT INTO users 
     (first_name, last_name, email, uuid)
     VALUES (${overrideUser.first_name}, ${overrideUser.last_name}, ${overrideUser.email}, ${overrideUser.uuid})
+
+    RETURNING *
     `)
 
   return result.rows

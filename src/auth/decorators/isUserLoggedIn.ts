@@ -1,8 +1,9 @@
+import fp from 'fastify-plugin'
 import { httpErrors } from '@fastify/sensible'
 import { sql } from 'drizzle-orm'
 import { FastifyInstance, FastifyRequest } from 'fastify'
 
-const isUserLoggedIn = async (fastify: FastifyInstance) => {
+const isUserLoggedIn = fp(async (fastify: FastifyInstance) => {
   fastify.decorate('user', null)
 
   fastify.decorate('isUserLoggedIn', async (request: FastifyRequest) => {
@@ -35,6 +36,6 @@ const isUserLoggedIn = async (fastify: FastifyInstance) => {
             WHERE session_id = ${sessionId} 
           `)
   })
-}
+})
 
 export default isUserLoggedIn

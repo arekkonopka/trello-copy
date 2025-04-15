@@ -69,14 +69,12 @@ export const logoutHandler = async (
   request: FastifyRequest
 ) => {
   const sessionId = request.session.sessionId
-
   if (!sessionId) {
     throw httpErrors.badRequest('Invalid session')
   }
 
   const result = await app.db.execute(sql`
-    UPDATE session 
-    SET is_active = false
+    DELETE FROM session 
     WHERE session_id = ${sessionId}`)
 
   if (result.rowCount === 0) {
@@ -84,6 +82,8 @@ export const logoutHandler = async (
       'Failed to log out. No session updated.'
     )
   }
+
+  return result
 }
 
 export const verifyPassword = (password: string, hash: string) => {
@@ -138,13 +138,26 @@ export const registerHandler = async (
 
   const user = await createUser(app, { email, first_name, last_name })
 
+  const userRoleUuid = await app.db.execute(
+    sql`SELECT uuid FROM roles WHERE name = 'user'`
+  )
+
+  if (!userRoleUuid?.rows?.length) {
+    throw new Error(`Role not found`)
+  }
+
+  // add "user" role for current user
+  await app.db.execute(
+    sql`INSERT INTO user_roles (user_uuid, role_uuid) VALUES (${user.uuid}, ${userRoleUuid?.rows[0]?.uuid})`
+  )
+
   const hashedPassword = await hashPassword(password)
   const otp = generateOTP()
 
   await app.db.execute(sql`
-  INSERT INTO auth (password, user_uuid, otp)
-    VALUES (${hashedPassword}, ${user.uuid}, ${otp})
-  `)
+      INSERT INTO auth (password, user_uuid, otp)
+      VALUES (${hashedPassword}, ${user.uuid}, ${otp})
+      `)
 
   await sendEmail(app, {
     to: email,

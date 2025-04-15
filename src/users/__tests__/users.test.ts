@@ -6,6 +6,7 @@ import {
   afterAll,
   afterEach,
   vi,
+  beforeEach,
 } from 'vitest'
 import buildServer from '../../app'
 import { GenericContainer, StartedTestContainer } from 'testcontainers'
@@ -21,11 +22,18 @@ import * as emailService from '../../email/email.service'
 import fs from 'fs'
 import path from 'path'
 import { EOL } from 'os'
+import { seedRolesAndPermissions } from '../../database/seeds/rolesAndPermissions'
+import { updateRole } from '../../database/helpers/createRole'
+import { TUserSchema } from '../schema/user.schema'
 
 describe('users', () => {
   let pgContainer: StartedTestContainer
   let redisContainer: StartedTestContainer
   let fastify: FastifyInstance
+
+  let sessionCookie: string
+  let userData: TUserSchema
+  let userCredentials: any
 
   beforeAll(async () => {
     vi.spyOn(emailService, 'sendEmail').mockImplementation(() =>
@@ -65,10 +73,23 @@ describe('users', () => {
     await redisContainer.stop()
   })
 
+  beforeEach(async () => {
+    await seedRolesAndPermissions(fastify.db)
+
+    const loginResult = await logInUser(fastify)
+    sessionCookie = loginResult.sessionCookie
+    userData = loginResult.userData
+    userCredentials = loginResult.userCredentials
+  })
+
   afterEach(async () => {
     await fastify.db.execute(sql`TRUNCATE TABLE users CASCADE`)
     await fastify.db.execute(sql`TRUNCATE TABLE session CASCADE`)
     await fastify.db.execute(sql`TRUNCATE TABLE jobs CASCADE`)
+    await fastify.db.execute(sql`TRUNCATE TABLE roles CASCADE`)
+    await fastify.db.execute(sql`TRUNCATE TABLE user_roles CASCADE`)
+    await fastify.db.execute(sql`TRUNCATE TABLE permissions CASCADE`)
+    await fastify.db.execute(sql`TRUNCATE TABLE role_permissions CASCADE`)
   })
 
   describe('/GET users', () => {
@@ -83,8 +104,6 @@ describe('users', () => {
     })
 
     it('should return 200', async () => {
-      const { sessionCookie } = await logInUser(fastify)
-
       const response = await request(fastify.server)
         .get('/users')
         .set('Cookie', sessionCookie)
@@ -108,8 +127,6 @@ describe('users', () => {
 
     // search
     it('should return empty array when no user is found with provided search', async () => {
-      const { sessionCookie } = await logInUser(fastify)
-
       const response = await request(fastify.server)
         .get('/users?search=emptyArrayUser')
         .set('Cookie', sessionCookie)
@@ -119,8 +136,6 @@ describe('users', () => {
     })
 
     it('should return array of users when first_name match search param', async () => {
-      const { sessionCookie } = await logInUser(fastify)
-
       const response = await request(fastify.server)
         .get('/users?search=john')
         .set('Cookie', sessionCookie)
@@ -141,8 +156,6 @@ describe('users', () => {
 
     // pagination
     it('should return 400 when limit is provided but offset is not', async () => {
-      const { sessionCookie } = await logInUser(fastify)
-
       const response = await request(fastify.server)
         .get('/users?limit=10')
         .set('Cookie', sessionCookie)
@@ -156,8 +169,6 @@ describe('users', () => {
     })
 
     it('should return 400 when offset is provided but limit is not', async () => {
-      const { sessionCookie } = await logInUser(fastify)
-
       const response = await request(fastify.server)
         .get('/users?offset=1')
         .set('Cookie', sessionCookie)
@@ -172,8 +183,6 @@ describe('users', () => {
 
     it('should return a correct subset of users based on limit and offset', async () => {
       await createUsers(fastify.db, 10)
-
-      const { sessionCookie } = await logInUser(fastify)
 
       const response = await request(fastify.server)
         .get('/users?limit=5&offset=1')
@@ -210,8 +219,6 @@ describe('users', () => {
           last_name: 'Smith',
         },
       ])
-
-      const { sessionCookie } = await logInUser(fastify)
 
       const response = await request(fastify.server)
         .get('/users?order_by=ASC')
@@ -260,8 +267,6 @@ describe('users', () => {
           last_name: 'Smith',
         },
       ])
-
-      const { sessionCookie } = await logInUser(fastify)
 
       const response = await request(fastify.server)
         .get('/users?order_by=DESC')
@@ -314,8 +319,6 @@ describe('users', () => {
     })
 
     it('should return 404 when user not found', async () => {
-      const { sessionCookie } = await logInUser(fastify)
-
       const response = await request(fastify.server)
         .get('/users/0e4adf5a-fcbb-4034-ac21-a15a761705ec')
         .set('Cookie', sessionCookie)
@@ -329,8 +332,6 @@ describe('users', () => {
     })
 
     it('should return user', async () => {
-      const { userCredentials, sessionCookie } = await logInUser(fastify)
-
       const response = await request(fastify.server)
         .get(`/users/${userCredentials.user_uuid}`)
         .set('Cookie', sessionCookie)
@@ -366,8 +367,6 @@ describe('users', () => {
     })
 
     it('should return 400 when user already exists', async () => {
-      const { sessionCookie, userData } = await logInUser(fastify)
-
       const response = await request(fastify.server)
         .post('/users')
         .send({
@@ -386,8 +385,6 @@ describe('users', () => {
     })
 
     it('should create user', async () => {
-      const { sessionCookie } = await logInUser(fastify)
-
       const response = await request(fastify.server)
         .post('/users')
         .send({
@@ -652,8 +649,6 @@ describe('users', () => {
 
   describe('/POST csv upload', () => {
     it('should return "Invalid file type. Only CSV files are allowed."', async () => {
-      const { sessionCookie } = await logInUser(fastify)
-
       const response = await request(fastify.server)
         .post('/users/csv-upload')
         .attach('file', Buffer.from('dummy'), 'test.pdf')
@@ -666,9 +661,7 @@ describe('users', () => {
       })
     })
 
-    it.only('should return "Invalid headers" because header is missing', async () => {
-      const { sessionCookie } = await logInUser(fastify)
-
+    it('should return "Invalid headers" because header is missing', async () => {
       // const user = await fastify.db.execute(sql`SELECT * FROM users`)
 
       // console.log('user', user.rows)
@@ -750,8 +743,6 @@ describe('users', () => {
     })
 
     it('should return 404 when user not found', async () => {
-      const { sessionCookie } = await logInUser(fastify)
-
       const response = await request(fastify.server)
         .patch('/users/0e4adf5a-fcbb-4034-ac21-a15a761705ec')
         .send({})
@@ -766,8 +757,6 @@ describe('users', () => {
     })
 
     it('should update user', async () => {
-      const { userCredentials, sessionCookie } = await logInUser(fastify)
-
       const response = await request(fastify.server)
         .patch(`/users/${userCredentials.user_uuid}`)
         .send({
@@ -806,7 +795,7 @@ describe('users', () => {
     })
 
     it('should return 404 when userNotFound', async () => {
-      const { sessionCookie } = await logInUser(fastify)
+      await updateRole(fastify.db, 'admin', userData.uuid)
 
       const response = await request(fastify.server)
         .delete('/users/0e4adf5a-fcbb-4034-ac21-a15a761705ec')
@@ -820,8 +809,23 @@ describe('users', () => {
       })
     })
 
+    it('should return 403 when user is not admin', async () => {
+      await updateRole(fastify.db, 'user', userData.uuid)
+
+      const response = await request(fastify.server)
+        .delete('/users/0e4adf5a-fcbb-4034-ac21-a15a761705ec')
+        .set('Cookie', sessionCookie)
+
+      expect(response.statusCode).toBe(403)
+      expect(response.body).toEqual({
+        error: 'Forbidden',
+        message: "You don't have permission to delete user",
+        statusCode: 403,
+      })
+    })
+
     it('should delete user', async () => {
-      const { sessionCookie } = await logInUser(fastify)
+      await updateRole(fastify.db, 'admin', userData.uuid)
 
       await createUser(fastify.db, {
         uuid: '0e4adf5a-fcbb-4034-ac21-a15a761705ec',

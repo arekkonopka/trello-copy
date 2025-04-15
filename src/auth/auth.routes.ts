@@ -51,9 +51,9 @@ const authRoutes = (fastify: FastifyInstance, _: object, done: () => void) => {
   )
 
   fastify.post('/logout', async (request, reply) => {
-    await logoutHandler(fastify, request)
+    const result = await logoutHandler(fastify, request)
 
-    reply.status(200)
+    reply.status(200).send(result)
   })
 
   fastify.post(

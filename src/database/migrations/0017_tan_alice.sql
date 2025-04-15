@@ -1,3 +1,4 @@
+ALTER TABLE "tickets" RENAME COLUMN "user_uuid" TO "assignee_uuid";--> statement-breakpoint
 ALTER TABLE "tickets" DROP CONSTRAINT "tickets_user_uuid_users_uuid_fk";
 --> statement-breakpoint
 ALTER TABLE "tickets" ALTER COLUMN "description" SET DATA TYPE text;--> statement-breakpoint
